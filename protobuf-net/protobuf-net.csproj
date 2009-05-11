@@ -24,7 +24,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;NET_3_0 REMOTING</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;NET_3_0 REMOTING EMIT2</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
@@ -44,7 +44,7 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Net20|AnyCPU' ">
     <OutputPath>bin\Net20\</OutputPath>
-    <DefineConstants>TRACE;REMOTING</DefineConstants>
+    <DefineConstants>TRACE;REMOTING NET_2_0</DefineConstants>
     <DocumentationFile>bin\Net20\protobuf-net.xml</DocumentationFile>
     <Optimize>true</Optimize>
     <DebugType>pdbonly</DebugType>
@@ -140,6 +140,31 @@
       <DependentUpon>IExtension.cs</DependentUpon>
     </Compile>
     <Compile Include="CallbackAttributes.cs" />
+    <Compile Include="Decorators\ArrayDecorator.cs" />
+    <Compile Include="Decorators\RepeatedDecorator.cs" />
+    <Compile Include="Decorators\UInt64Serializer.cs" />
+    <Compile Include="Decorators\UInt32Serializer.cs" />
+    <Compile Include="Decorators\GuidSerializer.cs" />
+    <Compile Include="Decorators\EnumSerializer.cs" />
+    <Compile Include="Decorators\FieldDecorator.cs" />
+    <Compile Include="Decorators\SingleSerializer.cs" />
+    <Compile Include="Decorators\foo.cs" />
+    <Compile Include="Decorators\Int64Serializer.cs" />
+    <Compile Include="Decorators\PropertyDecorator.cs" />
+    <Compile Include="Decorators\ClassSerializer.cs" />
+    <Compile Include="Decorators\RefTypeArrayDecorator.cs" />
+    <Compile Include="Decorators\BlobSerializer.cs" />
+    <Compile Include="Decorators\StringSerializer.cs" />
+    <Compile Include="Decorators\ClassDecorator.cs" />
+    <Compile Include="Decorators\CompositeSerializer.cs" />
+    <Compile Include="Decorators\DateTimeSerializer.cs" />
+    <Compile Include="Decorators\TimeSpanSerializer.cs" />
+    <Compile Include="Decorators\DecoratorBase.cs" />
+    <Compile Include="Decorators\Int32Serializer.cs" />
+    <Compile Include="Decorators\ArgsArrayDecorator.cs" />
+    <Compile Include="Decorators\DoubleSerializer.cs" />
+    <Compile Include="Decorators\ISerializer.cs" />
+    <Compile Include="Decorators\SerializerBase.cs" />
     <Compile Include="Delegates.cs" />
     <Compile Include="Entity.cs" />
     <Compile Include="Formatter.cs" />

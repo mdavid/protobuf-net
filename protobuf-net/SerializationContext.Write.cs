@@ -1,11 +1,14 @@
 ﻿using System;
 using System.IO;
 using ProtoBuf.Property;
+using ProtoBuf.Decorators;
 
 namespace ProtoBuf
 {
+    
     internal sealed partial class SerializationContext
     {
+        internal delegate int Serializer(SerializationContext context, object value);
         public void WriteByte(byte value)
         {
             Flush(1);
@@ -13,11 +16,11 @@ namespace ProtoBuf
             position++;
         }
 
-        public static uint Zig(int value)
+        public static uint ZigInt32(int value)
         {
             return (uint)((value << 1) ^ (value >> 31));
         }
-        public static ulong Zig(long value)
+        public static ulong ZigInt64(long value)
         {
             return (ulong)((value << 1) ^ (value >> 63));
         }
@@ -83,6 +86,78 @@ namespace ProtoBuf
             {
                 stream.Write(ioBuffer, 0, ioBufferIndex);
                 ioBufferIndex = 0;
+            }
+        }
+
+        internal int WriteLengthPrefixed(object value, uint underEstimatedLength, Serializer serializer)
+        {
+            Flush(); // commit to the stream before monkeying with the buffers...
+
+            MemoryStream ms = stream as MemoryStream;
+            if (ms != null)
+            {
+                // we'll write to out current stream, optimising
+                // for the case when the length-prefix is 1-byte;
+                // if not we'll have to BlockCopy
+                int startIndex = (int)ms.Position;
+                uint guessLength = underEstimatedLength,
+                    guessPrefixLength = (uint)this.EncodeUInt32(guessLength),
+                    actualLength = (uint)serializer.Invoke(this, value);
+
+                if (guessLength == actualLength)
+                { // good guess! nothing to do...
+                    return (int)(guessPrefixLength + actualLength);
+                }
+
+                uint actualPrefixLength = (uint)SerializationContext.GetLength(actualLength);
+
+                Flush(); // commit to the stream before we start messing with it... 
+
+                if (actualPrefixLength < guessPrefixLength)
+                {
+                    throw new ProtoException("Internal error; the serializer over-estimated the length. Sorry, but this shouldn't have happened.");
+                }
+                else if (actualPrefixLength > guessPrefixLength)
+                {
+                    // our guess of the length turned out to be bad; we need to
+                    // fix things...
+
+                    // extend the buffer to ensure we have space
+                    for (uint i = actualPrefixLength - guessPrefixLength; i > 0; i--)
+                    {
+                        ms.WriteByte(0);
+                        position++;
+                    }
+
+                    // move the data
+                    // (note; we MUST call GetBuffer *after* extending it,
+                    // otherwise there the buffer might change if we extend
+                    // over a boundary)
+                    byte[] buffer = ms.GetBuffer();
+                    Buffer.BlockCopy(buffer, (int)(startIndex + guessPrefixLength),
+                        buffer, (int)(startIndex + actualPrefixLength), (int)actualLength);
+                }
+
+                // back-fill the actual length into the buffer
+                SerializationContext.EncodeUInt32(actualLength, ms.GetBuffer(), startIndex);
+                return (int)(actualPrefixLength + actualLength);
+
+            }
+            else
+            {
+                // create a temporary stream and write the final result
+                using (ms = new MemoryStream())
+                {
+                    SerializationContext ctx = new SerializationContext(ms, this);
+                    int len = serializer.Invoke(ctx, value);
+                    ctx.Flush();
+                    this.ReadFrom(ctx);
+
+                    int preambleLen = this.EncodeInt32(len);
+                    byte[] buffer = ms.GetBuffer();
+                    this.WriteBlock(buffer, 0, len);
+                    return preambleLen + len;
+                }
             }
         }
 
@@ -160,16 +235,19 @@ namespace ProtoBuf
         public void WriteTo(Stream destination, int length)
         {
             CheckSpace(length > BLIT_BUFFER_SIZE ? BLIT_BUFFER_SIZE : length);
-            int max = workspace.Length, read;
+            int max = workspace.Length, read = 1; // this "1" ensures we get into the second block for short sequences
             while ((length >= max) && (read = Read(workspace, 0, max)) > 0)
             {
                 destination.Write(workspace, 0, read);
                 length -= read;
             }
-            while ((length > 0) && (read = Read(workspace, 0, length)) > 0)
+            if (read > 0)
             {
-                destination.Write(workspace, 0, read);
-                length -= read;
+                while ((length > 0) && (read = Read(workspace, 0, length)) > 0)
+                {
+                    destination.Write(workspace, 0, read);
+                    length -= read;
+                }
             }
             if (length != 0) throw new EndOfStreamException();
         }

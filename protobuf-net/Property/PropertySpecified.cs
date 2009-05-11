@@ -13,7 +13,7 @@ namespace ProtoBuf.Property
         {
             PropertyInfo prop = type.GetProperty(name + "Specified",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (prop == null || !prop.CanRead) return null;
+            if (prop == null || !prop.CanRead || prop.PropertyType != typeof(bool)) return null;
             int tag;
             DataFormat fmt;
             bool isReq;

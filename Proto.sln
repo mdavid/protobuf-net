@@ -33,6 +33,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "demo-rpc-server-mvc", "demo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "protobuf-net.Extensions-CF35", "protobuf-net.Extensions-CF35\protobuf-net.Extensions-CF35.csproj", "{414BC396-98D1-46F8-B3AA-A77CC87C7C82}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "protobuf-net-MF", "protobuf-net-MF\protobuf-net-MF.csproj", "{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -170,6 +172,16 @@ Global
 		{414BC396-98D1-46F8-B3AA-A77CC87C7C82}.Release|Any CPU.Build.0 = Release|Any CPU
 		{414BC396-98D1-46F8-B3AA-A77CC87C7C82}.Silverlight2|Any CPU.ActiveCfg = Release|Any CPU
 		{414BC396-98D1-46F8-B3AA-A77CC87C7C82}.Silverlight2|Any CPU.Build.0 = Release|Any CPU
+		{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}.Net20|Any CPU.ActiveCfg = Release|Any CPU
+		{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}.Net20|Any CPU.Build.0 = Release|Any CPU
+		{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}.Profile|Any CPU.ActiveCfg = Release|Any CPU
+		{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}.Profile|Any CPU.Build.0 = Release|Any CPU
+		{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}.Silverlight2|Any CPU.ActiveCfg = Release|Any CPU
+		{BB87C95C-6712-4D9E-A456-ED8EC4FD8926}.Silverlight2|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

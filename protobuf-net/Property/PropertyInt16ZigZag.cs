@@ -14,12 +14,12 @@ namespace ProtoBuf.Property
             short value = GetValue(source);
             if (IsOptional && value == DefaultValue) return 0;
             return WritePrefix(context)
-                + context.EncodeUInt32(SerializationContext.Zig(value));
+                + context.EncodeUInt32(SerializationContext.ZigInt32(value));
         }
 
         public override short DeserializeImpl(TSource source, SerializationContext context)
         {
-            return (short)SerializationContext.Zag(context.DecodeUInt32());
+            return (short)SerializationContext.ZagInt32(context.DecodeUInt32());
         }
     }
 }

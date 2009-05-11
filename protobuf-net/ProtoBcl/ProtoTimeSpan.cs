@@ -61,7 +61,7 @@ namespace ProtoBuf.ProtoBcl
                         scale = (TimeSpanScale)context.DecodeInt32();
                         break;
                     case (FieldTimeSpanValue << 3) | (int)WireType.Variant:
-                        value = SerializationContext.Zag(context.DecodeUInt64());
+                        value = SerializationContext.ZagInt64(context.DecodeUInt64());
                         break;
                     default:
                         WireType wireType;
@@ -167,7 +167,7 @@ namespace ProtoBuf.ProtoBcl
             }
 
             int len = 0;
-            ulong zig = SerializationContext.Zig(value);
+            ulong zig = SerializationContext.ZigInt64(value);
             if (lengthPrefixed)
             {
                 if (scale != TimeSpanScale.Days)

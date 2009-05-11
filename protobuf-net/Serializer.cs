@@ -35,7 +35,7 @@ namespace ProtoBuf
         internal static readonly Type[] EmptyTypes = new Type[0];
         internal static bool IsEntityType(Type type)
         {
-            return Entity.IsEntity(type);            
+            return EntityModel.Default.IsEntity(type);            
         }
 
         /// <summary>
@@ -611,9 +611,17 @@ namespace ProtoBuf
         /// <param name="destination">The destination stream to write to.</param>
         public static void Serialize<T>(Stream destination, T instance)
         {
+            Serialize(destination, typeof(T), instance);
+        }
+
+        static void Serialize(Stream destination, Type type, object value)
+        {
             try
             {
-                SerializerProxy<T>.Default.Serialize(instance, destination);
+                SerializationContext ctx = new SerializationContext(destination, null);
+                EntityModel.Default.GetSerializer(type, true).Serialize(ctx, value);
+                ctx.CheckNoRemainingGroups();
+                ctx.Flush();
             }
             catch (Exception ex)
             {
@@ -621,6 +629,7 @@ namespace ProtoBuf
                 throw; // if no inner (preserves stacktrace)
             }
         }
+
 
         /// <summary>
         /// Writes a protocol-buffer representation of the given instance to the supplied stream,
@@ -904,7 +913,7 @@ namespace ProtoBuf
 
         internal static string GetDefinedTypeName<T>()
         {
-            Entity e = Entity.Get(typeof(T));
+            Entity e = EntityModel.Default.Resolve(typeof(T), false);
             return e == null ? typeof(T).Name : e.Name;
         }
         
@@ -916,7 +925,20 @@ namespace ProtoBuf
             if ((tag & ~0x01FFFFFF) == 0) return 4; // 25 bits
             return 5;            
         }
-
+        internal static int ParseTag(uint token)
+        {
+            WireType wireType;
+            int tag;
+            try
+            {
+                ParseFieldToken(token, out wireType, out tag);
+                return tag;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
         internal static void ParseFieldToken(uint token, out WireType wireType, out int tag)
         {
             wireType = (WireType)(token & 7);

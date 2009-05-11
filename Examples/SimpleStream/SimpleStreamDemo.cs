@@ -43,8 +43,26 @@ namespace Examples.SimpleStream
             Test2 t2 = new Test2 { B = "Toms Spezialitäten" },
                 clone = Serializer.DeepClone(t2);
             Assert.AreEqual(t2.B, clone.B);
-            
         }
+
+        [Test]
+        public void LongStringTest()
+        {
+            StringBuilder sb = new StringBuilder();
+            Random rand = new Random(123456);
+            for (int i = 0; i < 5000; i++)
+            {
+                char c = 'a';
+                c+= (char)rand.Next(26);
+                sb.Append(c);
+            }
+
+            Test2 t2 = new Test2 { B = sb.ToString() },
+                clone = Serializer.DeepClone(t2);
+            Assert.AreEqual(t2.B, clone.B);
+            Assert.AreEqual(5000, t2.B.Length);
+        }
+
         [Test]
         public void MultiByteUTF8Len128() // started failing...
         {
@@ -136,10 +154,16 @@ namespace Examples.SimpleStream
                 Serializer.Serialize(ms, t5);
                 ms.Position = 0;
                 Test5 clone = Serializer.Deserialize<Test5>(ms);
-                if (t5.Data.Length != clone.Data.Length) return false;
+                if (t5.Data.Length != clone.Data.Length)
+                {
+                    return false;
+                }
                 for (int i = 0; i < t5.Data.Length; i++)
                 {
-                    if (t5.Data[i] != clone.Data[i]) return false;
+                    if (t5.Data[i] != clone.Data[i])
+                    {
+                        return false;
+                    }
                 }
                 Stopwatch watch = Stopwatch.StartNew();
                 for (int i = 0; i < count; i++)
@@ -234,6 +258,7 @@ namespace Examples.SimpleStream
             SomeEnumEntity dee = new SomeEnumEntity { Enum = 0};
             Serializer.Serialize(Stream.Null, dee);
         }
+
         [Test, ExpectedException(ExceptionType = typeof(ProtoException))]
         public void TestDeserializeUndefinedEnum()
         {

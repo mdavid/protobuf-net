@@ -281,11 +281,11 @@ namespace Examples.TestNumbers
                         = val;
 
                     NumRig clone = Serializer.DeepClone(rig);
-                    Assert.AreEqual(val, clone.Int64Default, "Default");
-                    Assert.AreEqual(val, clone.Int64FixedSize, "FixedSize");
-                    Assert.AreEqual(val, clone.Int64ZigZag, "ZigZag");
-                    Assert.AreEqual(val, clone.Int64TwosComplement, "TwosComplement");
-                    Assert.AreEqual(SUCCESS, clone.Foo, "EOF check: " + val.ToString());
+                    Assert.AreEqual(val, clone.Int64Default, "Default; " + val);
+                    Assert.AreEqual(val, clone.Int64FixedSize, "FixedSize; " + val);
+                    Assert.AreEqual(val, clone.Int64ZigZag, "ZigZag; " + val);
+                    Assert.AreEqual(val, clone.Int64TwosComplement, "TwosComplement; " + val);
+                    Assert.AreEqual(SUCCESS, clone.Foo, "EOF check: " + val.ToString() + "; " + val);
                 }
             }
         }

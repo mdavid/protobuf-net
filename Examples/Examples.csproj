@@ -39,7 +39,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;NET_3_0 NET_3_5 REMOTING</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;NET_3_0 NET_3_5 REMOTING EMIT2</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <UseVSHostingProcess>false</UseVSHostingProcess>
@@ -48,7 +48,7 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE;NET_3_0 NET_3_5 REMOTING</DefineConstants>
+    <DefineConstants>TRACE;NET_3_0 NET_3_5 REMOTING EMIT2</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <UseVSHostingProcess>false</UseVSHostingProcess>
@@ -131,6 +131,68 @@
     <Compile Include="GuidTests.cs" />
     <Compile Include="Inheritance.cs" />
     <Compile Include="InheritanceMidLevel.cs" />
+    <Compile Include="Issues\ComplexModel\Message.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message1.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message10.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message11.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message12.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message13.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message14.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message15.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message16.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message17.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message18.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message19.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message2.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message20.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message21.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message22.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message23.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message24.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message25.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message26.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message27.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message28.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message29.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message3.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message30.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message31.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message32.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message33.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message34.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message35.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message36.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message37.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message38.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message39.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message4.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message40.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message41.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message42.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message43.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message44.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message45.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message46.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message47.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message48.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message49.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message5.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message50.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message51.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message52.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message53.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message54.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message55.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message56.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message57.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message58.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message59.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message6.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message60.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message7.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message8.cs" />
+    <Compile Include="Issues\ComplexModel\Messages\Message9.cs" />
+    <Compile Include="Issues\Forum1.cs" />
     <Compile Include="Issues\Issue26.cs" />
     <Compile Include="Issues\Issue27.cs" />
     <Compile Include="Issues\Issue29.cs" />
@@ -180,6 +242,7 @@
     <Compile Include="SimpleStream\SimpleStreamDemo.cs" />
     <Compile Include="TagInference.cs" />
     <Compile Include="TestNumbers\NumberTests.cs" />
+    <Compile Include="TheBigRefactor\Basic.cs" />
     <Compile Include="TraceError.cs" />
     <Compile Include="ValueWrapper.cs" />
   </ItemGroup>

@@ -8,13 +8,13 @@ namespace ProtoBuf
 
 
 
-        public static int Zag(uint ziggedValue)
+        public static int ZagInt32(uint ziggedValue)
         {
             int value = (int)ziggedValue;
             return (-(value & 0x01)) ^ ((value >> 1) & ~Base128Variant.Int32Msb);
         }
 
-        public static long Zag(ulong ziggedValue)
+        public static long ZagInt64(ulong ziggedValue)
         {
             long value = (long)ziggedValue;
             return (-(value & 0x01L)) ^ ((value >> 1) & ~Base128Variant.Int64Msb);
