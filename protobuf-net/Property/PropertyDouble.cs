@@ -5,7 +5,7 @@ namespace ProtoBuf.Property
     {
         public override string DefinedType
         {
-            get { return ProtoFormat.FIXED64; }
+            get { return ProtoFormat.DOUBLE; }
         }
         public override WireType WireType { get { return WireType.Fixed64; } }
 
