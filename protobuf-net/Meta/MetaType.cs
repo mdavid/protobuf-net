@@ -391,6 +391,7 @@ namespace ProtoBuf.Meta
                 case TypeCode.UInt64: defaultValue = (ulong)0; break;
                 default:
                     if (effectiveType == typeof(TimeSpan)) defaultValue = TimeSpan.Zero;
+                    if (effectiveType == typeof(Guid)) defaultValue = Guid.Empty;
                     break;
             }
             bool done = false;
@@ -785,10 +786,14 @@ namespace ProtoBuf.Meta
 
         private bool enumPassthru;
 
+        /// <summary>
+        /// Gets or sets a value indicating that an enum should be treated directly as an int/short/etc, rather
+        /// than enforcing .proto enum rules. This is useful *in particul* for [Flags] enums.
+        /// </summary>
         public bool EnumPassthru
         {
             get { return enumPassthru; }
-            set { enumPassthru = value; }
+            set { ThrowIfFrozen(); enumPassthru = value; }
         }
     }
 }

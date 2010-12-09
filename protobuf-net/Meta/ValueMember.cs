@@ -98,6 +98,7 @@ namespace ProtoBuf.Meta
                 }
                 if (type == typeof(TimeSpan)) return TimeSpan.Parse(s);
                 if (type == typeof(Uri)) return s; // Uri is decorated as string
+                if (type == typeof(Guid)) return new Guid(s);
             }
             if (type.IsEnum) return Enum.ToObject(type, value);
             return Convert.ChangeType(value, type, CultureInfo.InvariantCulture);
@@ -339,6 +340,10 @@ namespace ProtoBuf.Meta
             ThrowIfFrozen();
             this.name = name;
         }
+        /// <summary>
+        /// Gets the logical name for this member in the schema (this is not critical for binary serialization, but may be used
+        /// when inferring a schema).
+        /// </summary>
         public string Name
         {
             get { return Helpers.IsNullOrEmpty(name) ? member.Name : name; }
