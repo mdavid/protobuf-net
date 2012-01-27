@@ -133,7 +133,9 @@ namespace ProtoBuf.Compiler
         }
         internal void CastToObject(Type type)
         {
-            if (type.IsValueType)
+            if (type == typeof(object))
+            { }
+            else if (type.IsValueType)
             {
                 il.Emit(OpCodes.Box, type);
 #if DEBUG_COMPILE
@@ -151,7 +153,9 @@ namespace ProtoBuf.Compiler
 
         internal void CastFromObject(Type type)
         {
-            if (type.IsValueType)
+            if (type == typeof(object))
+            { }
+            else if (type.IsValueType)
             {
 #if FX11
                 il.Emit(OpCodes.Unbox, type);
@@ -188,9 +192,10 @@ namespace ProtoBuf.Compiler
             }
             throw new ArgumentException("Meta-key not found", "metaKey");
         }
-        private readonly bool nonPublic;
+        private readonly bool nonPublic, isWriter;
         internal bool NonPublic { get { return nonPublic; } }
-        internal CompilerContext(ILGenerator il, bool isStatic, RuntimeTypeModel.SerializerPair[] methodPairs)
+        
+        internal CompilerContext(ILGenerator il, bool isStatic, bool isWriter, RuntimeTypeModel.SerializerPair[] methodPairs)
         {
             if (il == null) throw new ArgumentNullException("il");
             if (methodPairs == null) throw new ArgumentNullException("methodPairs");
@@ -198,11 +203,13 @@ namespace ProtoBuf.Compiler
             this.methodPairs = methodPairs;
             this.il = il;
             nonPublic = false;
+            this.isWriter = isWriter;
         }
 #if !FX11
         private CompilerContext(Type associatedType, bool isWriter, bool isStatic)
         {
             this.isStatic = isStatic;
+            this.isWriter = isWriter;
             nonPublic = true;
             Type[] paramTypes;
             Type returnType;
@@ -216,8 +223,13 @@ namespace ProtoBuf.Compiler
                 returnType = typeof(object);
                 paramTypes = new Type[] { typeof(object), typeof(ProtoReader) };
             }
-
-            method = new DynamicMethod("proto_" + Interlocked.Increment(ref next), returnType, paramTypes, associatedType,true);
+            int uniqueIdentifier;
+#if PLAT_NO_INTERLOCKED
+            uniqueIdentifier = ++next;
+#else
+            uniqueIdentifier = Interlocked.Increment(ref next);
+#endif
+            method = new DynamicMethod("proto_" + uniqueIdentifier.ToString(), returnType, paramTypes, associatedType.IsInterface ? typeof(object) : associatedType, true);
             this.il = method.GetILGenerator();
         }
 #endif
@@ -280,9 +292,9 @@ namespace ProtoBuf.Compiler
                 case 8: Emit(OpCodes.Ldc_I4_8); break;
                 case -1: Emit(OpCodes.Ldc_I4_M1); break;
                 default:
-                    if ((value & 0xFF) == value) // single-byte
+                    if (value >= -128 && value <= 127)
                     {
-                        il.Emit(OpCodes.Ldc_I4_S, (byte)value);
+                        il.Emit(OpCodes.Ldc_I4_S, (sbyte)value);
 #if DEBUG_COMPILE
                         Helpers.DebugWriteLine(OpCodes.Ldc_I4_S + ": " + value);
 #endif
@@ -295,7 +307,6 @@ namespace ProtoBuf.Compiler
 #endif
                     }
                     break;
-
 
             }
         }
@@ -547,6 +558,15 @@ namespace ProtoBuf.Compiler
         {
             EmitCtor(type, Helpers.EmptyTypes);
         }
+        public void EmitCtor(ConstructorInfo ctor)
+        {
+            if (ctor == null) throw new ArgumentNullException("ctor");
+            il.Emit(OpCodes.Newobj, ctor);
+#if DEBUG_COMPILE
+            Helpers.DebugWriteLine(OpCodes.Newobj + ": " + ctor.DeclaringType);
+#endif
+        }
+
         public void EmitCtor(Type type, params Type[] parameterTypes)
         {
             Helpers.DebugAssert(type != null);
@@ -560,9 +580,7 @@ namespace ProtoBuf.Compiler
             }
             else
             {
-                ConstructorInfo ctor = type.GetConstructor(
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                    null, parameterTypes, null);
+                ConstructorInfo ctor =  Helpers.GetConstructor(type, parameterTypes, true);
                 if (ctor == null) throw new InvalidOperationException("No suitable constructor found for " + type.FullName);
                 il.Emit(OpCodes.Newobj, ctor);
 #if DEBUG_COMPILE
@@ -589,11 +607,11 @@ namespace ProtoBuf.Compiler
         }
         public void LoadValue(PropertyInfo property)
         {
-            EmitCall(property.GetGetMethod(NonPublic));
+            EmitCall(Helpers.GetGetMethod(property, NonPublic));
         }
         public void StoreValue(PropertyInfo property)
         {
-            EmitCall(property.GetSetMethod(NonPublic));
+            EmitCall(Helpers.GetSetMethod(property, NonPublic));
         }
 
         internal void EmitInstance()
@@ -784,7 +802,7 @@ namespace ProtoBuf.Compiler
 #endif
             return label;
         }
-
+#if !FX11
         internal void Constrain(Type type)
         {
             il.Emit(OpCodes.Constrained, type);
@@ -792,6 +810,7 @@ namespace ProtoBuf.Compiler
             Helpers.DebugWriteLine(OpCodes.Constrained + ": " + type);
 #endif
         }
+#endif
 
         internal void TryCast(Type type)
         {
@@ -858,7 +877,12 @@ namespace ProtoBuf.Compiler
                 if (type.IsValueType)
                 {
                     ctx.LoadAddress(local, type);
+#if FX11
+                    ctx.LoadValue(local);
+                    ctx.CastToObject(type);
+#else
                     ctx.Constrain(type);
+#endif
                     ctx.EmitCall(dispose);                    
                 }
                 else
@@ -888,7 +912,7 @@ namespace ProtoBuf.Compiler
                 ctx.EndFinally();
                 this.local = null;
                 this.ctx = null;
-                label = default(CodeLabel);
+                label = new CodeLabel(); // default
             }
         }
 
@@ -938,21 +962,22 @@ namespace ProtoBuf.Compiler
             Type type = arr.Type;
             Helpers.DebugAssert(type.IsArray && arr.Type.GetArrayRank() == 1);
             type = type.GetElementType();
+            Helpers.DebugAssert(type != null, "Not an array: " + arr.Type.FullName);
             LoadValue(arr);
             LoadValue(i);
-            switch(Type.GetTypeCode(type)) {
-                case TypeCode.SByte: Emit(OpCodes.Ldelem_I1); break;
-                case TypeCode.Int16: Emit(OpCodes.Ldelem_I2); break;
-                case TypeCode.Int32: Emit(OpCodes.Ldelem_I4); break;
-                case TypeCode.Int64: Emit(OpCodes.Ldelem_I8); break;
+            switch(Helpers.GetTypeCode(type)) {
+                case ProtoTypeCode.SByte: Emit(OpCodes.Ldelem_I1); break;
+                case ProtoTypeCode.Int16: Emit(OpCodes.Ldelem_I2); break;
+                case ProtoTypeCode.Int32: Emit(OpCodes.Ldelem_I4); break;
+                case ProtoTypeCode.Int64: Emit(OpCodes.Ldelem_I8); break;
 
-                case TypeCode.Byte: Emit(OpCodes.Ldelem_U1); break;
-                case TypeCode.UInt16: Emit(OpCodes.Ldelem_U2); break;
-                case TypeCode.UInt32: Emit(OpCodes.Ldelem_U4); break;
-                case TypeCode.UInt64: Emit(OpCodes.Ldelem_I8); break; // odd, but this is what C# does...
+                case ProtoTypeCode.Byte: Emit(OpCodes.Ldelem_U1); break;
+                case ProtoTypeCode.UInt16: Emit(OpCodes.Ldelem_U2); break;
+                case ProtoTypeCode.UInt32: Emit(OpCodes.Ldelem_U4); break;
+                case ProtoTypeCode.UInt64: Emit(OpCodes.Ldelem_I8); break; // odd, but this is what C# does...
 
-                case TypeCode.Single: Emit(OpCodes.Ldelem_R4); break;
-                case TypeCode.Double: Emit(OpCodes.Ldelem_R8); break;
+                case ProtoTypeCode.Single: Emit(OpCodes.Ldelem_R4); break;
+                case ProtoTypeCode.Double: Emit(OpCodes.Ldelem_R8); break;
                 default:
                     if (type.IsValueType)
                     {
@@ -967,6 +992,7 @@ namespace ProtoBuf.Compiler
                     {
                         Emit(OpCodes.Ldelem_Ref);
                     }
+             
                     break;
             }
             
@@ -983,23 +1009,23 @@ namespace ProtoBuf.Compiler
             EmitCall(typeof(Type).GetMethod("GetTypeFromHandle"));
         }
 
-        internal void ConvertToInt32(TypeCode typeCode)
+        internal void ConvertToInt32(ProtoTypeCode typeCode)
         {
             switch (typeCode)
             {
-                case TypeCode.Byte:
-                case TypeCode.SByte:
-                case TypeCode.Int16:
-                case TypeCode.UInt16:
+                case ProtoTypeCode.Byte:
+                case ProtoTypeCode.SByte:
+                case ProtoTypeCode.Int16:
+                case ProtoTypeCode.UInt16:
                     Emit(OpCodes.Conv_I4);
                     break;
-                case TypeCode.Int32:
-                    break;                
-                case TypeCode.Int64:
+                case ProtoTypeCode.Int32:
+                    break;
+                case ProtoTypeCode.Int64:
                     Emit(OpCodes.Conv_Ovf_I4);
                     break;
-                case TypeCode.UInt32:
-                case TypeCode.UInt64:
+                case ProtoTypeCode.UInt32:
+                case ProtoTypeCode.UInt64:
                     Emit(OpCodes.Conv_Ovf_I4_Un);
                     break;
                 default:
@@ -1007,21 +1033,20 @@ namespace ProtoBuf.Compiler
             }
         }
 
-        internal void ConvertFromInt32(TypeCode typeCode)
+        internal void ConvertFromInt32(ProtoTypeCode typeCode)
         {
             switch (typeCode)
             {
-                case TypeCode.SByte: Emit(OpCodes.Conv_Ovf_U1); break;
-                case TypeCode.Byte: Emit(OpCodes.Conv_Ovf_I1); break;
-                case TypeCode.Int16: Emit(OpCodes.Conv_Ovf_I2); break;
-                case TypeCode.UInt16: Emit(OpCodes.Conv_Ovf_U2); break;
-                case TypeCode.Int32: break;
-                case TypeCode.UInt32: Emit(OpCodes.Conv_Ovf_U4); break;
-                case TypeCode.Int64: Emit(OpCodes.Conv_I8); break;
-                case TypeCode.UInt64: Emit(OpCodes.Conv_U8); break;
+                case ProtoTypeCode.SByte: Emit(OpCodes.Conv_Ovf_U1); break;
+                case ProtoTypeCode.Byte: Emit(OpCodes.Conv_Ovf_I1); break;
+                case ProtoTypeCode.Int16: Emit(OpCodes.Conv_Ovf_I2); break;
+                case ProtoTypeCode.UInt16: Emit(OpCodes.Conv_Ovf_U2); break;
+                case ProtoTypeCode.Int32: break;
+                case ProtoTypeCode.UInt32: Emit(OpCodes.Conv_Ovf_U4); break;
+                case ProtoTypeCode.Int64: Emit(OpCodes.Conv_I8); break;
+                case ProtoTypeCode.UInt64: Emit(OpCodes.Conv_U8); break;
                 default: throw new InvalidOperationException();
             }
-
         }
 
         internal void LoadValue(decimal value)
@@ -1041,6 +1066,41 @@ namespace ProtoBuf.Compiler
 
                 EmitCtor(typeof(decimal), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool), typeof(byte) });
             }
+        }
+
+        internal void LoadValue(Guid value)
+        {
+            if (value == Guid.Empty)
+            {
+                LoadValue(typeof(Guid).GetField("Empty"));
+            }
+            else
+            { // note we're adding lots of shorts/bytes here - but at the IL level they are I4, not I1/I2 (which barely exist)
+                byte[] bytes = value.ToByteArray();
+                int i = (bytes[0]) | (bytes[1] << 8) | (bytes[2] << 16) | (bytes[3] << 24);
+                LoadValue(i);
+                short s = (short)((bytes[4]) | (bytes[5] << 8));
+                LoadValue(s);
+                s = (short)((bytes[6]) | (bytes[7] << 8));
+                LoadValue(s);
+                for (i = 8; i <= 15; i++)
+                {
+                    LoadValue(bytes[i]);
+                }
+                EmitCtor(typeof(Guid), new Type[] { typeof(int), typeof(short), typeof(short),
+                            typeof(byte), typeof(byte), typeof(byte), typeof(byte), typeof(byte), typeof(byte), typeof(byte), typeof(byte) });
+            }
+        }
+
+        internal void LoadValue(bool value)
+        {
+            Emit(value ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
+        }
+
+        internal void LoadSerializationContext()
+        {
+            LoadReaderWriter();
+            LoadValue((isWriter ? typeof(ProtoWriter) : typeof(ProtoReader)).GetProperty("Context"));
         }
     }
 }

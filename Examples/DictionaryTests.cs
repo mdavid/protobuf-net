@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using System.Linq;
+using NUnit.Framework;
 using System.Collections.Generic;
 using ProtoBuf;
 using System;
@@ -100,7 +101,73 @@ namespace Examples.Dictionary
             }
         }
     }
+    [TestFixture]
+    public class EmptyDictionaryTests
+    {
+        [Test]
+        public void EmptyDictionaryShouldDeserializeAsNonNull()
+        {
+            using (var ms = new MemoryStream())
+            {
+                var data = new Dictionary<string, int>();
 
+                Serializer.Serialize(ms, data);
+                ms.Position = 0;
+                var clone = Serializer.Deserialize<Dictionary<string, int>>(ms);
+
+                Assert.IsNotNull(clone);
+                Assert.AreEqual(0, clone.Count);
+            }
+        }
+        [Test]
+        public void NonEmptyDictionaryShouldDeserialize()
+        {
+            using (var ms = new MemoryStream())
+            {
+                var data = new Dictionary<string, int> { { "abc", 123 } };
+
+                Serializer.Serialize(ms, data);
+                ms.Position = 0;
+                var clone = Serializer.Deserialize<Dictionary<string, int>>(ms);
+
+                Assert.IsNotNull(clone);
+                Assert.AreEqual(1, clone.Count);
+                Assert.AreEqual(123, clone["abc"]);
+            }
+        }
+        [Test]
+        public void EmptyDictionaryShouldDeserializeAsNonNullViaInterface()
+        {
+            using (var ms = new MemoryStream())
+            {
+                var data = new Dictionary<string, int>();
+
+                Serializer.Serialize(ms, data);
+                ms.Position = 0;
+                var clone = Serializer.Deserialize<IDictionary<string, int>>(ms);
+
+                Assert.IsNotNull(clone);
+                Assert.AreEqual(0, clone.Count);
+            }
+
+        }
+        [Test]
+        public void NonEmptyDictionaryShouldDeserializeViaInterface()
+        {
+            using (var ms = new MemoryStream())
+            {
+                var data = new Dictionary<string, int> { { "abc", 123 } };
+
+                Serializer.Serialize(ms, data);
+                ms.Position = 0;
+                var clone = Serializer.Deserialize<IDictionary<string, int>>(ms);
+
+                Assert.IsNotNull(clone);
+                Assert.AreEqual(1, clone.Count);
+                Assert.AreEqual(123, clone["abc"]);
+            }
+        }
+    }
     [TestFixture]
     public class NestedDictionaryTests {
 
@@ -213,7 +280,7 @@ namespace Examples.Dictionary
             Console.WriteLine("Ser (kv-grouped)\t" + s3);
             Console.WriteLine("Deser (kv-grouped)\t" + d3);
 
-            var pw = new ProtoWriter(Stream.Null, null);
+            var pw = new ProtoWriter(Stream.Null, null, null);
             Stopwatch watch = Stopwatch.StartNew();
             for (int i = 0; i < LOOP; i++ ) {
                 ProtoWriter.WriteFieldHeader(1, WireType.String, pw);
@@ -282,6 +349,5 @@ namespace Examples.Dictionary
             [ProtoMember(2)] public int Field2 { get; set;}
             [ProtoMember(3)] public int Field3 { get; set;}
         }
-
     }
 }

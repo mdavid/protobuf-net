@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using NUnit.Framework;
 using ProtoBuf;
-
+using ProtoBuf.Meta;
+using System.Linq;
 namespace Examples
 {
     [ProtoContract]
@@ -54,10 +56,84 @@ namespace Examples
         [ProtoMember(1)]
         public int[,] Values { get; set; }
     }
-    
+
+    [ProtoContract(SkipConstructor=false)]
+    public class WithAndWithoutOverwrite
+    {
+        [ProtoMember(1, OverwriteList=false)]
+        public int[] Append = { 1, 2, 3 };
+
+        [ProtoMember(2, OverwriteList=true)]
+        public int[] Overwrite = { 4, 5, 6 };
+    }
+    [ProtoContract(SkipConstructor=true)]
+    public class WithSkipConstructor
+    {
+        [ProtoMember(1)]
+        public int[] Values = { 1, 2, 3 };
+    }
+
     [TestFixture]
     public class ArrayTests
     {
+        [ProtoContract]
+        class Foo { }
+        [Test]
+        public void DeserializeNakedArray()
+        {
+            var arr = new Foo[0];
+            var model = TypeModel.Create();
+            Foo[] foo = (Foo[])model.DeepClone(arr);
+            Assert.AreEqual(0, foo.Length);
+        }
+        [Test]
+        public void DeserializeBusyArray()
+        {
+            var arr = new Foo[3] { new Foo(), new Foo(), new Foo() };
+            var model = TypeModel.Create();
+            Foo[] foo = (Foo[])model.DeepClone(arr);
+            Assert.AreEqual(3, foo.Length);
+        }
+        [Test]
+        public void TestOverwriteVersusAppend()
+        {
+            var orig = new WithAndWithoutOverwrite { Append = new[] {7,8}, Overwrite = new[] { 9,10}};
+            var model = TypeModel.Create();
+            model.AutoCompile = false;
+            model.Add(typeof(WithAndWithoutOverwrite), true);
+
+            var clone = (WithAndWithoutOverwrite)model.DeepClone(orig);
+            Assert.IsTrue(clone.Overwrite.SequenceEqual(new[] { 9, 10 }), "Overwrite, Runtime");
+            Assert.IsTrue(clone.Append.SequenceEqual(new[] { 1, 2, 3, 7, 8 }), "Append, Runtime");
+
+            model.CompileInPlace();
+            clone = (WithAndWithoutOverwrite)model.DeepClone(orig);
+            Assert.IsTrue(clone.Overwrite.SequenceEqual(new[] { 9, 10 }), "Overwrite, CompileInPlace");
+            Assert.IsTrue(clone.Append.SequenceEqual(new[] { 1, 2, 3, 7, 8 }), "Append, CompileInPlace");
+
+            clone = (WithAndWithoutOverwrite)(model.Compile()).DeepClone(orig);
+            Assert.IsTrue(clone.Overwrite.SequenceEqual(new[] { 9, 10 }), "Overwrite, Compile");
+            Assert.IsTrue(clone.Append.SequenceEqual(new[] { 1, 2, 3, 7, 8 }), "Append, Compile");
+        }
+
+        [Test]
+        public void TestSkipConstructor()
+        {
+            var orig = new WithSkipConstructor { Values = new[] { 4, 5 } };
+            var model = TypeModel.Create();
+            model.AutoCompile = false;
+            model.Add(typeof(WithSkipConstructor), true);
+
+            var clone = (WithSkipConstructor)model.DeepClone(orig);
+            Assert.IsTrue(clone.Values.SequenceEqual(new[] { 4, 5 }), "Runtime");
+
+            model.CompileInPlace();
+            clone = (WithSkipConstructor)model.DeepClone(orig);
+            Assert.IsTrue(clone.Values.SequenceEqual(new[] { 4, 5 }), "CompileInPlace");
+
+            clone = (WithSkipConstructor)(model.Compile()).DeepClone(orig);
+            Assert.IsTrue(clone.Values.SequenceEqual(new[] { 4, 5 }), "Compile");
+        }
 
         [Test]
         public void TestPrimativeArray()
@@ -182,6 +258,51 @@ namespace Examples
             VerifyNodeTree(node);
         }
 
+        [Test]
+        public void TestStringArray()
+        {
+            var foo = new List<string> { "abc", "def", "ghi" };
+
+            var clone = Serializer.DeepClone(foo);
+                
+        }
+
+        [ProtoContract]
+        internal class Tst
+        {
+            [ProtoMember(1)]
+            public int ValInt
+            {
+                get;
+                set;
+            }
+
+            [ProtoMember(2)]
+            public byte[] ArrayData
+            {
+                get;
+                set;
+            }
+
+            [ProtoMember(3)]
+            public string Str1
+            {
+                get;
+                set;
+            }
+        }
+        [Test]
+        public void TestEmptyArrays()
+        {
+            Tst t = new Tst();
+            t.ValInt = 128;
+            t.Str1 = "SOme string text value ttt";
+            t.ArrayData = new byte[] { };
+
+            MemoryStream stm = new MemoryStream();
+            Serializer.Serialize(stm, t);
+            Console.WriteLine(stm.Length);
+        }
         static void VerifyNodeTree(Node node) {
             Node clone = Serializer.DeepClone(node);
             string msg;

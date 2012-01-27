@@ -6,15 +6,19 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Runtime.Serialization.Formatters.Soap;
 using System.Text;
 using System.Xml.Serialization;
+using NUnit.Framework;
 using ProtoBuf;
 using System.Runtime.Serialization;
+using System.ComponentModel;
+using System.ServiceModel;
 #if NET_3_0
 using System.ServiceModel;
+#if FEAT_SERVICEMODEL && PLAT_XMLSERIALIZER
 using ProtoBuf.ServiceModel;
+#endif
 #endif
 #if NET_3_5
 using System.Runtime.Serialization.Json;
-using NUnit.Framework;
 using Serializer = ProtoBuf.Serializer;
 using System.ComponentModel;
 #endif
@@ -256,7 +260,9 @@ namespace Examples.SimpleStream
         }
         [Test]
         public void TestDeserializeUndefinedEnum()
-        {
+        { // this looks insane but is correct; it drops data on the floor to match the expected
+            //
+
             var see = Program.Build<SomeEnumEntity>(0x10, 0x09);
             Assert.AreEqual(SomeEnum.Bar, see.Enum);
         }
@@ -624,7 +630,7 @@ namespace Examples.SimpleStream
     public interface IFoo
     {
         [OperationContract]
-#if NET_3_0
+#if NET_3_0 && FEAT_SERVICEMODEL && PLAT_XMLSERIALIZER
         [ProtoBehavior]
 #endif
         Test3 Bar(Test1 value);

@@ -10,10 +10,10 @@ namespace ProtoBuf
     /// a nested message to retain wire-compatibility with
     /// other protocol-buffer implementations.
     /// </summary>
-    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface, AllowMultiple = true, Inherited = false)]
     public sealed class ProtoIncludeAttribute : Attribute
     {
-        /// <summary>
+        ///<summary>
         /// Creates a new instance of the ProtoIncludeAttribute.
         /// </summary>
         /// <param name="tag">The unique index (within the type) that will identify this data.</param>
@@ -29,22 +29,22 @@ namespace ProtoBuf
         public ProtoIncludeAttribute(int tag, string knownTypeName)
         {
             if (tag <= 0) throw new ArgumentOutOfRangeException("tag", "Tags must be positive integers");
-            if (string.IsNullOrEmpty(knownTypeName)) throw new ArgumentNullException("knownTypeName", "Known type cannot be blank");
-            Tag = tag;
-            KnownTypeName = knownTypeName;
+            if (Helpers.IsNullOrEmpty(knownTypeName)) throw new ArgumentNullException("knownTypeName", "Known type cannot be blank");
+            this.tag = tag;
+            this.knownTypeName = knownTypeName;
         }
 
         /// <summary>
         /// Gets the unique index (within the type) that will identify this data.
         /// </summary>
-        public int Tag { get { return tag; } private set { tag = value; } }
-        private int tag;
+        public int Tag { get { return tag; } }
+        private readonly int tag;
 
         /// <summary>
         /// Gets the additional type to serialize/deserialize.
         /// </summary>
-        public string KnownTypeName { get { return name; } private set { name = value; } }
-        private string name;
+        public string KnownTypeName { get { return knownTypeName; } }
+        private readonly string knownTypeName;
 
         /// <summary>
         /// Gets the additional type to serialize/deserialize.
@@ -53,13 +53,13 @@ namespace ProtoBuf
         {
             get
             {
-                return Type.GetType(KnownTypeName);
+                return ResolveKnownType(null);
             }
         }
 
         internal Type ResolveKnownType(Assembly assembly)
         {
-            if (string.IsNullOrEmpty(KnownTypeName)) return null;
+            if (Helpers.IsNullOrEmpty(KnownTypeName)) return null;
             try
             {
                 Type type = Type.GetType(KnownTypeName);
@@ -70,7 +70,7 @@ namespace ProtoBuf
             {
                 int i = KnownTypeName.IndexOf(',');
                 string fullName = (i > 0 ? KnownTypeName.Substring(0, i) : KnownTypeName).Trim();
-                Type type = (assembly ?? Assembly.GetCallingAssembly()).GetType(fullName);
+                Type type = (assembly == null ? Assembly.GetCallingAssembly() : assembly).GetType(fullName);
                 if (type != null) return type;
             }
             catch { }

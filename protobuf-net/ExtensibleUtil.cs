@@ -13,8 +13,17 @@ namespace ProtoBuf
     /// API; can't put into Serializer&lt;T&gt; since we need to invoke
     /// accross classes, which isn't allowed in Silverlight)
     /// </summary>
-    internal static class ExtensibleUtil
+    internal
+#if FX11
+    sealed
+#else
+    static
+#endif
+        class ExtensibleUtil
     {
+#if FX11
+        private ExtensibleUtil() { } // not a static class for C# 1.2 reasons
+#endif
         /// <summary>
         /// All this does is call GetExtendedValuesTyped with the correct type for "instance";
         /// this ensures that we don't get issues with subclasses declaring conflicting types -
@@ -136,7 +145,7 @@ namespace ProtoBuf
             if(instance == null) throw new ArgumentNullException("instance");
             if(value == null) throw new ArgumentNullException("value");
 
-            //TODO: CheckTagNotInUse
+            // TODO
             //model.CheckTagNotInUse(tag);
 
             // obtain the extension object and prepare to write
@@ -145,8 +154,8 @@ namespace ProtoBuf
             bool commit = false;
             Stream stream = extn.BeginAppend();
             try {
-                using(ProtoWriter writer = new ProtoWriter(stream, model)) {
-                    model.TrySerializeAuxiliaryType(writer, null, format, tag, value);
+                using(ProtoWriter writer = new ProtoWriter(stream, model, null)) {
+                    model.TrySerializeAuxiliaryType(writer, null, format, tag, value, false);
                     writer.Close();
                 }
                 commit = true;

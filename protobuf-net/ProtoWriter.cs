@@ -1,7 +1,6 @@
 ﻿using System;
 
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Text;
 using ProtoBuf.Meta;
 #if MF
@@ -31,7 +30,38 @@ namespace ProtoBuf
             {
                 throw new InvalidOperationException("Cannot serialize sub-objects unless a model is provided");
             }
-            SubItemToken token = StartSubItem(value, writer);
+
+                SubItemToken token = StartSubItem(value, writer);
+                if (key >= 0)
+                {
+                    writer.model.Serialize(key, value, writer);
+                }
+                else if (writer.model != null && writer.model.TrySerializeAuxiliaryType(writer, value.GetType(), DataFormat.Default, Serializer.ListItemTag, value, false))
+                {
+                    // all ok
+                }
+                else
+                {
+                    TypeModel.ThrowUnexpectedType(value.GetType());
+                }
+                EndSubItem(token, writer);
+ 
+        }
+        /// <summary>
+        /// Write an encapsulated sub-object, using the supplied unique key (reprasenting a type) - but the
+        /// caller is asserting that this relationship is non-recursive; no recursion check will be
+        /// performed.
+        /// </summary>
+        /// <param name="value">The object to write.</param>
+        /// <param name="key">The key that uniquely identifies the type within the model.</param>
+        /// <param name="writer">The destination.</param>
+        public static void WriteRecursionSafeObject(object value, int key, ProtoWriter writer)
+        {
+            if (writer.model == null)
+            {
+                throw new InvalidOperationException("Cannot serialize sub-objects unless a model is provided");
+            }
+            SubItemToken token = StartSubItem(null, writer);
             writer.model.Serialize(key, value, writer);
             EndSubItem(token, writer);
         }
@@ -59,13 +89,35 @@ namespace ProtoBuf
                     throw new ArgumentOutOfRangeException("style");
             }
             SubItemToken token = StartSubItem(value, writer, true);
-            writer.model.Serialize(key, value, writer);
+            if (key < 0)
+            {
+                if (!writer.model.TrySerializeAuxiliaryType(writer, value.GetType(), DataFormat.Default, Serializer.ListItemTag, value, false))
+                {
+                    TypeModel.ThrowUnexpectedType(value.GetType());
+                }
+            }
+            else
+            {
+                writer.model.Serialize(key, value, writer);
+            }
             EndSubItem(token, writer, style);
             
         }
+
+        internal int GetTypeKey(ref Type type)
+        {
+            return model.GetKey(ref type);
+        }
+        
+        private readonly NetObjectCache netCache = new NetObjectCache();
+        internal NetObjectCache NetCache
+        {
+            get { return netCache;}
+        }
+
         private int fieldNumber, flushLock;
         WireType wireType;
-
+        internal WireType WireType { get { return wireType; } }
         /// <summary>
         /// Writes a field-header, indicating the format of the next data we plan to write.
         /// </summary>
@@ -145,6 +197,7 @@ namespace ProtoBuf
                     goto CopyFixedLength;  // ugly but effective
                 case WireType.String:
                     WriteUInt32Variant((uint)length, writer);
+                    writer.wireType = WireType.None;
                     if (length == 0) return;
                     if (writer.flushLock != 0 || length <= writer.ioBuffer.Length) // write to the buffer
                     {
@@ -157,7 +210,6 @@ namespace ProtoBuf
                     writer.dest.Write(data, offset, length);
                     writer.position += length; // since we've flushed offset etc is 0, and remains
                                         // zero since we're writing directly to the stream
-                    writer.wireType = WireType.None;
                     return;
             }
             throw CreateException(writer);
@@ -231,10 +283,19 @@ namespace ProtoBuf
         MutableList recursionStack;
         private void CheckRecursionStackAndPush(object instance)
         {
+            int hitLevel;
             if (recursionStack == null) { recursionStack = new MutableList(); }
-            else if (instance != null && recursionStack.IndexOfReference(instance) >= 0)
+            else if (instance != null && (hitLevel = recursionStack.IndexOfReference(instance)) >= 0)
             {
-                throw new ProtoException("Possible recursion detected; " + instance.ToString());
+#if DEBUG
+                Helpers.DebugWriteLine("Stack:");
+                foreach(object obj in recursionStack)
+                {
+                    Helpers.DebugWriteLine(obj == null ? "<null>" : obj.ToString());
+                }
+                Helpers.DebugWriteLine(instance == null ? "<null>" : instance.ToString());
+#endif
+                throw new ProtoException("Possible recursion detected (offset: " + (recursionStack.Count - hitLevel).ToString() + " level(s)): " + instance.ToString());
             }
             recursionStack.Add(instance);
         }
@@ -351,12 +412,14 @@ namespace ProtoBuf
             // and this object is no longer a blockage
             writer.flushLock--;
         }
+
         /// <summary>
         /// Creates a new writer against a stream
         /// </summary>
         /// <param name="dest">The destination stream</param>
         /// <param name="model">The model to use for serialization; this can be null, but this will impair the ability to serialize sub-objects</param>
-        public ProtoWriter(Stream dest, TypeModel model)
+        /// <param name="context">Additional context about this serialization operation</param>
+        public ProtoWriter(Stream dest, TypeModel model, SerializationContext context)
         {
             if (dest == null) throw new ArgumentNullException("dest");
             if (!dest.CanWrite) throw new ArgumentException("Cannot write to stream", "dest");
@@ -365,8 +428,17 @@ namespace ProtoBuf
             this.ioBuffer = BufferPool.GetBuffer();
             this.model = model;
             this.wireType = WireType.None;
+            if (context == null) { context = SerializationContext.Default; }
+            else { context.Freeze(); }
+            this.context = context;
+            
         }
-        
+
+        private readonly SerializationContext context;
+        /// <summary>
+        /// Addition information about this serialization operation.
+        /// </summary>
+        public SerializationContext Context { get { return context; } }
         void IDisposable.Dispose()
         {
             Dispose();
@@ -803,5 +875,18 @@ namespace ProtoBuf
             if (fieldNumber <= 0) throw new ArgumentOutOfRangeException("fieldNumber");
             writer.packedFieldNumber = fieldNumber;
         }
+
+        internal string SerializeType(Type type)
+        {
+            return model.SerializeType(type);
+        }
+        /// <summary>
+        /// Specifies a known root object to use during reference-tracked serialization
+        /// </summary>
+        public void SetRootObject(object value)
+        {
+            NetCache.SetKeyedObject(NetObjectCache.Root, value);
+        }
+
     }
 }

@@ -1,28 +1,49 @@
 ﻿
+using System.Threading;
 namespace ProtoBuf
 {
     internal class BufferPool
     {
+        internal static void Flush()
+        {
+#if PLAT_NO_INTERLOCKED
+            lock(pool)
+            {
+                for (int i = 0; i < pool.Length; i++) pool[i] = null;
+            }
+#else
+            for (int i = 0; i < pool.Length; i++)
+            {
+                Interlocked.Exchange(ref pool[i], null); // and drop the old value on the floor
+            }
+#endif
+        }
         private BufferPool() { }
         const int PoolSize = 20;
         internal const int BufferLength = 1024;
-        private static readonly byte[][] pool = new byte[PoolSize][];
+        private static readonly object[] pool = new object[PoolSize];
 
         internal static byte[] GetBuffer()
         {
-            lock (pool)
+            object tmp;
+            #if PLAT_NO_INTERLOCKED
+            lock(pool)
             {
                 for (int i = 0; i < pool.Length; i++)
                 {
-                    if (pool[i] != null)
+                    if((tmp = pool[i]) != null)
                     {
-                        byte[] result = pool[i];
                         pool[i] = null;
-                        return result;
+                        return (byte[])tmp;
                     }
                 }
             }
-
+#else
+            for (int i = 0; i < pool.Length; i++)
+            {
+                if ((tmp = Interlocked.Exchange(ref pool[i], null)) != null) return (byte[])tmp;
+            }
+#endif
             return new byte[BufferLength];
         }
         internal static void ResizeAndFlushLeft(ref byte[] buffer, int toFitAtLeastBytes, int copyFromIndex, int copyBytes)
@@ -50,28 +71,32 @@ namespace ProtoBuf
         internal static void ReleaseBufferToPool(ref byte[] buffer)
         {
             if (buffer == null) return;
-            try
+            if (buffer.Length == BufferLength)
             {
-                if (buffer.Length == BufferLength)
+#if PLAT_NO_INTERLOCKED
+                lock (pool)
                 {
-                    lock (pool)
+                    for (int i = 0; i < pool.Length; i++)
                     {
-                        for (int i = 0; i < pool.Length; i++)
+                        if(pool[i] == null)
                         {
-                            if (pool[i] == null)
-                            {
-                                pool[i] = buffer;
-                                break;
-                            }
+                            pool[i] = buffer;
+                            break;
                         }
                     }
                 }
+#else
+                for (int i = 0; i < pool.Length; i++)
+                {
+                    if (Interlocked.CompareExchange(ref pool[i], buffer, null) == null)
+                    {
+                        break; // found a null; swapped it in
+                    }
+                }
+#endif
             }
-            finally
-            {
-                // if no space, just drop it on the floor
-                buffer = null;
-            }
+            // if no space, just drop it on the floor
+            buffer = null;
         }
 
     }

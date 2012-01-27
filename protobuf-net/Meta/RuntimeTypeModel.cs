@@ -7,6 +7,7 @@ using System.Reflection.Emit;
 #endif
 
 using ProtoBuf.Serializers;
+using System.Threading;
 
 
 namespace ProtoBuf.Meta
@@ -16,6 +17,59 @@ namespace ProtoBuf.Meta
     /// </summary>
     public sealed class RuntimeTypeModel : TypeModel
     {
+        private byte options;
+        private const byte
+           OPTIONS_InferTagFromNameDefault = 1,
+           OPTIONS_IsDefaultModel = 2,
+           OPTIONS_Frozen = 4,
+           OPTIONS_AutoAddMissingTypes = 8,
+#if FEAT_COMPILER && !FX11
+           OPTIONS_AutoCompile = 16,
+#endif
+           OPTIONS_UseImplicitZeroDefaults = 32;
+        private bool GetOption(byte option)
+        {
+            return (options & option) == option;
+        }
+        private void SetOption(byte option, bool value)
+        {
+            if (value) options |= option;
+            else options &= (byte)~option;
+        }
+        /// <summary>
+        /// Global default for that
+        /// enables/disables automatic tag generation based on the existing name / order
+        /// of the defined members. See <seealso cref="ProtoContractAttribute.InferTagFromName"/>
+        /// for usage and <b>important warning</b> / explanation.
+        /// You must set the global default before attempting to serialize/deserialize any
+        /// impacted type.
+        /// </summary>
+        public bool InferTagFromNameDefault
+        {
+            get { return GetOption(OPTIONS_InferTagFromNameDefault); }
+            set { SetOption(OPTIONS_InferTagFromNameDefault, value); }
+        }
+        /// <summary>
+        /// Global switch that enables or disables the implicit
+        /// handling of "zero defaults"; meanning: if no other default is specified,
+        /// it assumes bools always default to false, integers to zero, etc.
+        /// 
+        /// If this is disabled, no such assumptions are made and only *explicit*
+        /// default values are processed. This is enabled by default to 
+        /// preserve similar logic to v1.
+        /// </summary>
+        public bool UseImplicitZeroDefaults
+        {
+            get {return GetOption(OPTIONS_UseImplicitZeroDefaults);}
+            set {
+                if (!value && GetOption(OPTIONS_IsDefaultModel))
+                {
+                    throw new InvalidOperationException("UseImplicitZeroDefaults cannot be disabled on the default model");
+                }
+                SetOption(OPTIONS_UseImplicitZeroDefaults, value);
+            }
+        }
+
         private class Singleton
         {
             private Singleton() { }
@@ -33,13 +87,14 @@ namespace ProtoBuf.Meta
         /// processed by this model.
         /// </summary>
         public IEnumerable GetTypes() { return types; }
-        private readonly bool isDefault;
+
         internal RuntimeTypeModel(bool isDefault)
         {
             AutoAddMissingTypes = true;
-            this.isDefault = isDefault;
-#if !DEBUG
-            autoCompile = true; 
+            UseImplicitZeroDefaults = true;
+            SetOption(OPTIONS_IsDefaultModel, isDefault);
+#if FEAT_COMPILER && !FX11 && !DEBUG
+            AutoCompile = true;
 #endif
         }
         /// <summary>
@@ -53,7 +108,11 @@ namespace ProtoBuf.Meta
             // this list is thread-safe for reading
             foreach (MetaType metaType in types)
             {
-                if (metaType.Type == type) return metaType;
+                if (metaType.Type == type)
+                {
+                    if (metaType.Pending) WaitOnLock(metaType);
+                    return metaType;
+                }
             }
             // if that failed, check for a proxy
             Type underlyingType = ResolveProxies(type);
@@ -68,11 +127,27 @@ namespace ProtoBuf.Meta
                 return ((MetaType)obj).Type == type;
             }
         }
+        private void WaitOnLock(MetaType type)
+        {
+            int opaqueToken = 0;
+            try
+            {
+                TakeLock(ref opaqueToken);
+            }
+            finally
+            {
+                ReleaseLock(opaqueToken);
+            }
+        }
         internal int FindOrAddAuto(Type type, bool demand, bool addWithContractOnly, bool addEvenIfAutoDisabled)
         {
             TypeFinder predicate = new TypeFinder(type);
             int key = types.IndexOf(predicate);
-
+            MetaType metaType;
+            if (key >= 0 && (metaType = ((MetaType)types[key])).Pending)
+            {
+                WaitOnLock(metaType);
+            }
             if (key < 0)
             {
                 // check for proxy types
@@ -87,24 +162,30 @@ namespace ProtoBuf.Meta
 
             if (key < 0)
             {
-                MetaType metaType;
-                // try to recognise a few familiar patterns...
-                if ((metaType = RecogniseCommonTypes(type)) == null)
-                { // otherwise, check if it is a contract
-                    bool shouldAdd = autoAddMissingTypes || addEvenIfAutoDisabled;
-                    if (!shouldAdd || (
-                        addWithContractOnly && MetaType.GetContractFamily(type, null) == MetaType.AttributeFamily.None)
-                        )
-                    {
-                        if (demand) ThrowUnexpectedType(type);
-                        return key;
+                int opaqueToken = 0;
+                try
+                {
+                    TakeLock(ref opaqueToken);
+                    // try to recognise a few familiar patterns...
+                    if ((metaType = RecogniseCommonTypes(type)) == null)
+                    { // otherwise, check if it is a contract
+                        MetaType.AttributeFamily family = MetaType.GetContractFamily(type, null);
+                        if (family == MetaType.AttributeFamily.AutoTuple) addEvenIfAutoDisabled = true; // always add basic tuples, such as KeyValuePair
+
+                        bool shouldAdd = AutoAddMissingTypes || addEvenIfAutoDisabled;
+                        if (!shouldAdd || (
+                            !type.IsEnum && addWithContractOnly && family == MetaType.AttributeFamily.None)
+                            )
+                        {
+                            if (demand) ThrowUnexpectedType(type);
+                            return key;
+                        }
+                        metaType = Create(type);
                     }
-                    metaType = Create(type);
-                }
-                
-                bool weAdded = false;
-                lock (types)
-                {   // double-checked
+                    metaType.Pending = true;                    
+                    bool weAdded = false;
+
+                    // double-checked
                     int winner = types.IndexOf(predicate);
                     if (winner < 0)
                     {
@@ -116,34 +197,42 @@ namespace ProtoBuf.Meta
                     {
                         key = winner;
                     }
+                    if (weAdded)
+                    {
+                        metaType.ApplyDefaultBehaviour();
+                        metaType.Pending = false;
+                    }
                 }
-                if (weAdded) metaType.ApplyDefaultBehaviour();
+                finally
+                {
+                    ReleaseLock(opaqueToken);
+                }
             }
             return key;
         }
 
         private MetaType RecogniseCommonTypes(Type type)
         {
-#if !NO_GENERICS
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(System.Collections.Generic.KeyValuePair<,>))
-            {
-                MetaType mt = new MetaType(this, type);
-//#pragma warning disable 618 // we're *allowed* to do this; user code isn't (we might roll this as a bespoke serializer rather than a surrogate at some point)
-                Type surrogate = typeof (KeyValuePairSurrogate<,>).MakeGenericType(type.GetGenericArguments());
-//#pragma warning restore 618
-                mt.SetSurrogate(surrogate);
-                mt.IncludeSerializerMethod = false;
-                mt.Freeze();
+//#if !NO_GENERICS
+//            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(System.Collections.Generic.KeyValuePair<,>))
+//            {
+//                MetaType mt = new MetaType(this, type);
 
-                MetaType surrogateMeta = (MetaType)types[FindOrAddAuto(surrogate, true, true, true)]; // this forcibly adds it if needed
-                if(surrogateMeta.IncludeSerializerMethod)
-                { // don't blindly set - it might be frozen
-                    surrogateMeta.IncludeSerializerMethod = false;
-                }
-                surrogateMeta.Freeze();
-                return mt;
-            }
-#endif
+//                Type surrogate = typeof (KeyValuePairSurrogate<,>).MakeGenericType(type.GetGenericArguments());
+
+//                mt.SetSurrogate(surrogate);
+//                mt.IncludeSerializerMethod = false;
+//                mt.Freeze();
+
+//                MetaType surrogateMeta = (MetaType)types[FindOrAddAuto(surrogate, true, true, true)]; // this forcibly adds it if needed
+//                if(surrogateMeta.IncludeSerializerMethod)
+//                { // don't blindly set - it might be frozen
+//                    surrogateMeta.IncludeSerializerMethod = false;
+//                }
+//                surrogateMeta.Freeze();
+//                return mt;
+//            }
+//#endif
             return null;
         }
         private MetaType Create(Type type)
@@ -151,11 +240,15 @@ namespace ProtoBuf.Meta
             ThrowIfFrozen();
             return new MetaType(this, type);
         }
+
+
         /// <summary>
         /// Adds support for an additional type in this model, optionally
-        /// appplying inbuilt patterns.
+        /// appplying inbuilt patterns. If the type is already known to the
+        /// model, the existing type is returned **without** applying
+        /// any additional behaviour.
         /// </summary>
-        /// <remarks>Inbuild patterns include:
+        /// <remarks>Inbuilt patterns include:
         /// [ProtoContract]/[ProtoMember(n)]
         /// [DataContract]/[DataMember(Order=n)]
         /// [XmlType]/[XmlElement(Order=n)]
@@ -163,51 +256,69 @@ namespace ProtoBuf.Meta
         /// ShouldSerialize*/*Specified
         /// </remarks>
         /// <param name="type">The type to be supported</param>
-        /// <param name="applyDefaultBehaviour">Whether to apply the inbuilt patterns, or
-        /// jut add the type with no additional configuration.</param>
+        /// <param name="applyDefaultBehaviour">Whether to apply the inbuilt configuration patterns (via attributes etc), or
+        /// just add the type with no additional configuration (the type must then be manually configured).</param>
         /// <returns>The MetaType representing this type, allowing
         /// further configuration.</returns>
         public MetaType Add(Type type, bool applyDefaultBehaviour)
         {
             if (type == null) throw new ArgumentNullException("type");
-            if (FindWithoutAdd(type) != null) throw new ArgumentException("Duplicate type", "type");
-            MetaType newType = RecogniseCommonTypes(type);
-            if(newType != null)
+            MetaType newType = FindWithoutAdd(type);
+            if (newType != null) return newType; // return existing
+            int opaqueToken = 0;
+            
+#if WINRT
+            TypeInfo typeInfo = type.GetTypeInfo();
+            if (typeInfo.IsInterface && MetaType.ienumerable.IsAssignableFrom(typeInfo)
+#else
+            if (type.IsInterface && MetaType.ienumerable.IsAssignableFrom(type)
+#endif
+                    && GetListItemType(type) == null)
             {
-                if(!applyDefaultBehaviour) {
-                    throw new ArgumentException(
-                        "Default behaviour must be observed for certain types with special handling; " + type.Name,
-                        "applyDefaultBehaviour");
-                }
-                // we should assume that type is fully configured, though; no need to re-run:
-                applyDefaultBehaviour = false;
+                throw new ArgumentException("IEnumerable[<T>] data cannot be used as a meta-type unless an Add method can be resolved");
             }
-            if(newType == null) newType = Create(type);
-            bool weAdded = false;
-            lock (types)
+            try
             {
+                newType = RecogniseCommonTypes(type);
+                if(newType != null)
+                {
+                    if(!applyDefaultBehaviour) {
+                        throw new ArgumentException(
+                            "Default behaviour must be observed for certain types with special handling; " + type.FullName,
+                            "applyDefaultBehaviour");
+                    }
+                    // we should assume that type is fully configured, though; no need to re-run:
+                    applyDefaultBehaviour = false;
+                }
+                if(newType == null) newType = Create(type);
+                newType.Pending = true;
+                TakeLock(ref opaqueToken);
                 // double checked
                 if (FindWithoutAdd(type) != null) throw new ArgumentException("Duplicate type", "type");
                 ThrowIfFrozen();
                 types.Add(newType);
-                weAdded = true;
+                if (applyDefaultBehaviour) { newType.ApplyDefaultBehaviour(); }
+                newType.Pending = false;
             }
-            if (weAdded && applyDefaultBehaviour) { newType.ApplyDefaultBehaviour(); }
+            finally
+            {
+                ReleaseLock(opaqueToken);
+            }
+            
             return newType;
         }
 
-        bool frozen, autoAddMissingTypes, autoCompile;
-
+#if FEAT_COMPILER && !FX11
         /// <summary>
         /// Should serializers be compiled on demand? It may be useful
         /// to disable this for debugging purposes.
         /// </summary>
         public bool AutoCompile
         {
-            get { return autoCompile; }
-            set { autoCompile = value; }
+            get { return GetOption(OPTIONS_AutoCompile); }
+            set { SetOption(OPTIONS_AutoCompile, value); }
         }
-
+#endif
         /// <summary>
         /// Should support for unexpected types be added automatically?
         /// If false, an exception is thrown when unexpected types
@@ -215,14 +326,14 @@ namespace ProtoBuf.Meta
         /// </summary>
         public bool AutoAddMissingTypes
         {
-            get { return autoAddMissingTypes; }
+            get { return GetOption(OPTIONS_AutoAddMissingTypes); }
             set {
-                if (!value && isDefault)
+                if (!value && GetOption(OPTIONS_IsDefaultModel))
                 {
                     throw new InvalidOperationException("The default model must allow missing types");
                 }
                 ThrowIfFrozen();
-                autoAddMissingTypes = value;
+                SetOption(OPTIONS_AutoAddMissingTypes, value);
             }
         }
         /// <summary>
@@ -230,15 +341,15 @@ namespace ProtoBuf.Meta
         /// </summary>
         private void ThrowIfFrozen()
         {
-            if (frozen) throw new InvalidOperationException("The model cannot be changed once frozen");
+            if (GetOption(OPTIONS_Frozen)) throw new InvalidOperationException("The model cannot be changed once frozen");
         }
         /// <summary>
         /// Prevents further changes to this model
         /// </summary>
         public void Freeze()
         {
-            if (isDefault) throw new InvalidOperationException("The default model cannot be frozen");
-            frozen = true;
+            if (GetOption(OPTIONS_IsDefaultModel)) throw new InvalidOperationException("The default model cannot be frozen");
+            SetOption(OPTIONS_Frozen, true);
         }
 
         private readonly BasicList types = new BasicList();
@@ -252,17 +363,30 @@ namespace ProtoBuf.Meta
         }
         internal int GetKey(Type type, bool demand, bool getBaseKey)
         {
-            int typeIndex = FindOrAddAuto(type, demand, true, false);
-            if (typeIndex >= 0)
+            Helpers.DebugAssert(type != null);
+            try
             {
-                MetaType mt = (MetaType)types[typeIndex], baseType;
-                if (getBaseKey && (baseType = mt.BaseType) != null)
-                {   // part of an inheritance tree; pick the base-key
-                    while (baseType != null) { mt = baseType; baseType = baseType.BaseType;}
-                    typeIndex = FindOrAddAuto(mt.Type, true, true, false);
+                int typeIndex = FindOrAddAuto(type, demand, true, false);
+                if (typeIndex >= 0)
+                {
+                    MetaType mt = (MetaType)types[typeIndex];
+                    if (getBaseKey)
+                    {
+                        mt = MetaType.GetRootType(mt);
+                        typeIndex = FindOrAddAuto(mt.Type, true, true, false);                        
+                    }
                 }
+                return typeIndex;
             }
-            return typeIndex;
+            catch (NotSupportedException)
+            {
+                throw; // re-surface "as-is"
+            }
+            catch (Exception ex)
+            {
+                if (ex.Message.IndexOf(type.FullName) >= 0) throw;  // already enough info
+                throw new ProtoException(ex.Message + " (" + type.FullName + ")", ex);
+            }
         }
         /// <summary>
         /// Writes a protocol-buffer representation of the given instance to the supplied stream.
@@ -288,7 +412,7 @@ namespace ProtoBuf.Meta
         {
             //Helpers.DebugWriteLine("Deserialize", value);
             IProtoSerializer ser = ((MetaType)types[key]).Serializer;
-            if (value == null && ser.ExpectedType.IsValueType) {
+            if (value == null && Helpers.IsValueType(ser.ExpectedType)) {
                 return ser.Read(Activator.CreateInstance(ser.ExpectedType), source);
             } else {
                 return ser.Read(value, source);
@@ -459,11 +583,19 @@ namespace ProtoBuf.Meta
             SerializerPair[] methodPairs = new SerializerPair[types.Count];
             foreach (MetaType metaType in types)
             {
-                MethodBuilder writeMethod = type.DefineMethod("Write",
+                MethodBuilder writeMethod = type.DefineMethod("Write"
+#if DEBUG
+ + metaType.Type.Name
+#endif
+                    ,
                     MethodAttributes.Private | MethodAttributes.Static, CallingConventions.Standard,
                     typeof(void), new Type[] { metaType.Type, typeof(ProtoWriter) });
 
-                MethodBuilder readMethod = type.DefineMethod("Read",
+                MethodBuilder readMethod = type.DefineMethod("Read"
+#if DEBUG
+ + metaType.Type.Name
+#endif              
+                    ,
                     MethodAttributes.Private | MethodAttributes.Static, CallingConventions.Standard,
                     metaType.Type, new Type[] { metaType.Type, typeof(ProtoReader) });
 
@@ -481,13 +613,16 @@ namespace ProtoBuf.Meta
             for(index = 0; index < methodPairs.Length ; index++)
             {
                 SerializerPair pair = methodPairs[index];
-                ctx = new Compiler.CompilerContext(pair.SerializeBody, true, methodPairs);
+                ctx = new Compiler.CompilerContext(pair.SerializeBody, true, true, methodPairs);
                 pair.Type.Serializer.EmitWrite(ctx, Compiler.Local.InputValue);
                 ctx.Return();
 
-                ctx = new Compiler.CompilerContext(pair.DeserializeBody, true, methodPairs);
+                ctx = new Compiler.CompilerContext(pair.DeserializeBody, true, false, methodPairs);
                 pair.Type.Serializer.EmitRead(ctx, Compiler.Local.InputValue);
-                ctx.LoadValue(Compiler.Local.InputValue);
+                if (!pair.Type.Serializer.ReturnsValue)
+                {
+                    ctx.LoadValue(Compiler.Local.InputValue);
+                }
                 ctx.Return();
             }
 
@@ -558,7 +693,7 @@ namespace ProtoBuf.Meta
             }
             
             il = Override(type, "Serialize");
-            ctx = new Compiler.CompilerContext(il, false, methodPairs);
+            ctx = new Compiler.CompilerContext(il, false, true, methodPairs);
             // arg0 = this, arg1 = key, arg2=obj, arg3=dest
             Label[] jumpTable = new Label[types.Count];
             for (int i = 0; i < jumpTable.Length; i++) {
@@ -579,7 +714,7 @@ namespace ProtoBuf.Meta
             }
 
             il = Override(type, "Deserialize");
-            ctx = new Compiler.CompilerContext(il, false, methodPairs);
+            ctx = new Compiler.CompilerContext(il, false, false, methodPairs);
             // arg0 = this, arg1 = key, arg2=obj, arg3=source
             for (int i = 0; i < jumpTable.Length; i++)
             {
@@ -617,7 +752,7 @@ namespace ProtoBuf.Meta
             
             il = ctor.GetILGenerator();
             il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Call, baseType.GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance)[0]);
+            il.Emit(OpCodes.Call, Helpers.GetConstructor(baseType, Helpers.EmptyTypes, true));
             il.Emit(OpCodes.Ldarg_0);
             Compiler.CompilerContext.LoadValue(il, types.Count);
             il.Emit(OpCodes.Newarr, typeof(Type));
@@ -651,7 +786,7 @@ namespace ProtoBuf.Meta
             MethodInfo dedicated = methodPairs[i].Deserialize;
             MethodBuilder boxedSerializer = type.DefineMethod("_" + i, MethodAttributes.Static, CallingConventions.Standard,
                 typeof(object), new Type[] { typeof(object), typeof(ProtoReader) });
-            Compiler.CompilerContext ctx = new Compiler.CompilerContext(boxedSerializer.GetILGenerator(), true, methodPairs);
+            Compiler.CompilerContext ctx = new Compiler.CompilerContext(boxedSerializer.GetILGenerator(), true, false, methodPairs);
             ctx.LoadValue(Compiler.Local.InputValue);
             Compiler.CodeLabel @null = ctx.DefineLabel();
             ctx.BranchIfFalse(@null, true);
@@ -684,13 +819,146 @@ namespace ProtoBuf.Meta
         {
             return FindWithoutAdd(type).IsDefined(fieldNumber);
         }
+        internal bool IsPrepared(Type type)
+        {
+            MetaType meta = FindWithoutAdd(type);
+            return meta != null && meta.IsPrepared();
+        }
 
         internal EnumSerializer.EnumPair[] GetEnumMap(Type type)
         {
             int index = FindOrAddAuto(type, false, false, false);
             return index < 0 ? null : ((MetaType)types[index]).GetEnumMap();
         }
+
+        private int metadataTimeoutMilliseconds = 5000;
+        /// <summary>
+        /// The amount of time to wait if there are concurrent metadata access operations
+        /// </summary>
+        public int MetadataTimeoutMilliseconds
+        {
+            get { return metadataTimeoutMilliseconds; }
+            set
+            {
+                if (value <= 0) throw new ArgumentOutOfRangeException("MetadataTimeoutMilliseconds");
+                metadataTimeoutMilliseconds = value;
+            }
+        }
+
+        internal void TakeLock(ref int opaqueToken)
+        {
+            const string message = "Timeout while inspecting metadata; this may indicate a deadlock. This can often be avoided by preparing necessary serializers during application initialization, rather than allowing multiple threads to perform the initial metadata inspection; please also see the LockContended event";
+            opaqueToken = 0;
+#if CF2 || CF35
+            int remaining = metadataTimeoutMilliseconds;
+            bool lockTaken;
+            do {
+                lockTaken = Monitor.TryEnter(types);
+                if(!lockTaken)
+                {
+                    if(remaining <= 0) throw new TimeoutException(message);
+                    remaining -= 50;
+                    Thread.Sleep(50);
+                }
+            } while(!lockTaken);
+            opaqueToken = Interlocked.CompareExchange(ref contentionCounter, 0, 0); // just fetch current value (starts at 1)
+#else
+            if (Monitor.TryEnter(types, metadataTimeoutMilliseconds))
+            {
+                opaqueToken = GetContention(); // just fetch current value (starts at 1)
+            }
+            else
+            {
+                AddContention();
+#if FX11
+                throw new InvalidOperationException(message);
+#else
+                throw new TimeoutException(message);
+#endif
+            }
+#endif
+        }
+
+        private int contentionCounter = 1;
+#if PLAT_NO_INTERLOCKED
+        private readonly object contentionLock = new object();
+#endif
+        private int GetContention()
+        {
+#if PLAT_NO_INTERLOCKED
+            lock(contentionLock)
+            {
+                return contentionCounter;
+            }
+#else
+            return Interlocked.CompareExchange(ref contentionCounter, 0, 0);
+#endif
+        }
+        private void AddContention()
+        {
+#if PLAT_NO_INTERLOCKED
+            lock(contentionLock)
+            {
+                contentionCounter++;
+            }
+#else
+            Interlocked.Increment(ref contentionCounter);
+#endif
+        }
+
+        internal void ReleaseLock(int opaqueToken)
+        {
+            if (opaqueToken != 0)
+            {
+                Monitor.Exit(types);
+                if(opaqueToken != GetContention()) // contention-count changes since we looked!
+                {
+                    LockContentedEventHandler handler = LockContended;
+                    if (handler != null)
+                    {
+                        // not hugely elegant, but this is such a far-corner-case that it doesn't need to be slick - I'll settle for cross-platform
+                        string stackTrace;
+                        try
+                        {
+                            throw new Exception();
+                        }
+                        catch(Exception ex)
+                        {
+                            stackTrace = ex.StackTrace;
+                        }
+                        
+                        handler(this, new LockContentedEventArgs(stackTrace));
+                    }
+                }
+            }
+        }
+        /// <summary>
+        /// If a lock-contention is detected, this event signals the *owner* of the lock responsible for the blockage, indicating
+        /// what caused the problem; this is only raised if the lock-owning code successfully completes.
+        /// </summary>
+        public event LockContentedEventHandler LockContended;
+        
     }
-    
+    /// <summary>
+    /// Contains the stack-trace of the owning code when a lock-contention scenario is detected
+    /// </summary>
+    public sealed class LockContentedEventArgs : EventArgs
+    {
+        private readonly string ownerStackTrace;
+        internal LockContentedEventArgs(string ownerStackTrace)
+        {
+            this.ownerStackTrace = ownerStackTrace;
+        }
+        /// <summary>
+        /// The stack-trace of the code that owned the lock when a lock-contention scenario occurred
+        /// </summary>
+        public string OwnerStackTrace { get { return ownerStackTrace; } }
+    }
+    /// <summary>
+    /// Event-type that is raised when a lock-contention scenario is detected
+    /// </summary>
+    public delegate void LockContentedEventHandler(object sender, LockContentedEventArgs args);
+
+
 }
 #endif

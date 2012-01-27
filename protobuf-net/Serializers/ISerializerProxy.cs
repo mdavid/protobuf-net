@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿#if !NO_RUNTIME
 
 namespace ProtoBuf.Serializers
 {
@@ -9,3 +7,4 @@ namespace ProtoBuf.Serializers
         IProtoSerializer Serializer { get; }
     }
 }
+#endif

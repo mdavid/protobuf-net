@@ -11,17 +11,45 @@ namespace ProtoBuf
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field,
         AllowMultiple = false, Inherited = true)]
     public class ProtoMemberAttribute : Attribute
+        , IComparable
+#if !NO_GENERICS
+        , IComparable<ProtoMemberAttribute>
+#endif
+
     {
+        /// <summary>
+        /// Compare with another ProtoMemberAttribute for sorting purposes
+        /// </summary>
+        public int CompareTo(object other) { return CompareTo(other as ProtoMemberAttribute); }
+        /// <summary>
+        /// Compare with another ProtoMemberAttribute for sorting purposes
+        /// </summary>
+        public int CompareTo(ProtoMemberAttribute other)
+        {
+            if (other == null) return -1;
+            if ((object)this == (object)other) return 0;
+            int result = this.tag.CompareTo(other.tag);
+            if (result == 0) result = string.CompareOrdinal(this.name, other.name);
+            return result;
+        }
+
         /// <summary>
         /// Creates a new ProtoMemberAttribute instance.
         /// </summary>
         /// <param name="tag">Specifies the unique tag used to identify this member within the type.</param>
-        public ProtoMemberAttribute(int tag)
+        public ProtoMemberAttribute(int tag) : this(tag, false)
+        { }
+
+        internal ProtoMemberAttribute(int tag, bool forced)
         {
-            if (tag <= 0) throw new ArgumentOutOfRangeException("tag");
+            if (tag <= 0 && !forced) throw new ArgumentOutOfRangeException("tag");
             this.tag = tag;
         }
-        
+
+#if !NO_RUNTIME
+        internal System.Reflection.MemberInfo Member;
+        internal bool TagIsPinned;
+#endif
         /// <summary>
         /// Gets or sets the original name defined in the .proto; not used
         /// during serialization.
@@ -39,7 +67,8 @@ namespace ProtoBuf
         /// Gets the unique tag used to identify this member within the type.
         /// </summary>
         public int Tag { get { return tag; } }
-        private readonly int tag;
+        private int tag;
+        internal void Rebase(int tag) { this.tag = tag; }
 
         /// <summary>
         /// Gets or sets a value indicating whether this member is mandatory.
@@ -52,8 +81,9 @@ namespace ProtoBuf
             }
         }
 
-         /// <summary>
+        /// <summary>
         /// Gets a value indicating whether this member is packed.
+        /// This option only applies to list/array data of primitive types (int, double, etc).
         /// </summary>
         public bool IsPacked
         {
@@ -61,6 +91,46 @@ namespace ProtoBuf
             set {
                 if (value) options |= MemberSerializationOptions.Packed;
                 else options &= ~MemberSerializationOptions.Packed;
+            }
+        }
+
+        /// <summary>
+        /// Indicates whether this field should *repace* existing values (the default is false, meaning *append*).
+        /// This option only applies to list/array data.
+        /// </summary>
+        public bool OverwriteList
+        {
+            get { return (options & MemberSerializationOptions.OverwriteList) == MemberSerializationOptions.OverwriteList; }
+            set
+            {
+                if (value) options |= MemberSerializationOptions.OverwriteList;
+                else options &= ~MemberSerializationOptions.OverwriteList;
+            }
+        }
+
+        /// <summary>
+        /// Enables full object-tracking/full-graph support.
+        /// </summary>
+        public bool AsReference
+        {
+            get { return (options & MemberSerializationOptions.AsReference) == MemberSerializationOptions.AsReference; }
+            set
+            {
+                if (value) options |= MemberSerializationOptions.AsReference;
+                else options &= ~MemberSerializationOptions.AsReference;
+            }
+        }
+
+        /// <summary>
+        /// Embeds the type information into the stream, allowing usage with types not known in advance.
+        /// </summary>
+        public bool DynamicType
+        {
+            get { return (options & MemberSerializationOptions.DynamicType) == MemberSerializationOptions.DynamicType; }
+            set
+            {
+                if (value) options |= MemberSerializationOptions.DynamicType;
+                else options &= ~MemberSerializationOptions.DynamicType;
             }
         }
 
@@ -90,7 +160,20 @@ namespace ProtoBuf
         /// <summary>
         /// Indicates that the given item is required
         /// </summary>
-        Required = 2
+        Required = 2,
+        /// <summary>
+        /// Enables full object-tracking/full-graph support
+        /// </summary>
+        AsReference = 4,
+        /// <summary>
+        /// Embeds the type information into the stream, allowing usage with types not known in advance
+        /// </summary>
+        DynamicType = 8,
+        /// <summary>
+        /// Indicates whether this field should *repace* existing values (the default is false, meaning *append*).
+        /// This option only applies to list/array data.
+        /// </summary>
+        OverwriteList = 16,
     }
 
     /// <summary>
@@ -114,7 +197,7 @@ namespace ProtoBuf
         public ProtoPartialMemberAttribute(int tag, string memberName)
             : base(tag)
         {
-            if (string.IsNullOrEmpty(memberName)) throw new ArgumentNullException("memberName");
+            if (Helpers.IsNullOrEmpty(memberName)) throw new ArgumentNullException("memberName");
             this.memberName = memberName;
         }
         /// <summary>

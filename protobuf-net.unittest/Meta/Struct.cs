@@ -26,14 +26,14 @@ namespace ProtoBuf.unittest.Meta
                 new IProtoSerializer[] {
                     new PropertyDecorator(typeof(CustomerStruct), typeof(CustomerStruct).GetProperty("Id"), new TagDecorator(1, WireType.Variant, false, new Int32Serializer())),
                     new FieldDecorator(typeof(CustomerStruct), typeof(CustomerStruct).GetField("Name"), new TagDecorator(2, WireType.String, false, new StringSerializer()))
-                }, null, false, true, null);
+                }, null, false, true, null, null, null);
             var deser = CompilerContext.BuildDeserializer(head);
 
-            using (var reader = new ProtoReader(Stream.Null, null))
+            using (var reader = new ProtoReader(Stream.Null, null, null))
             {
                 Assert.IsInstanceOfType(typeof(CustomerStruct), deser(null, reader));
             }
-            using (var reader = new ProtoReader(Stream.Null, null))
+            using (var reader = new ProtoReader(Stream.Null, null, null))
             {
                 CustomerStruct before = new CustomerStruct { Id = 123, Name = "abc" };
                 CustomerStruct after = (CustomerStruct)deser(before, reader);
@@ -49,19 +49,19 @@ namespace ProtoBuf.unittest.Meta
                 new IProtoSerializer[] {
                     new PropertyDecorator(typeof(CustomerStruct), typeof(CustomerStruct).GetProperty("Id"), new TagDecorator(1, WireType.Variant,false,  new Int32Serializer())),
                     new FieldDecorator(typeof(CustomerStruct), typeof(CustomerStruct).GetField("Name"), new TagDecorator(2, WireType.String,false,  new StringSerializer()))
-                }, null, false, true, null);
+                }, null, false, true, null, null, null);
             var ser = CompilerContext.BuildSerializer(head);
             var deser = CompilerContext.BuildDeserializer(head);
             CustomerStruct cs1 = new CustomerStruct { Id = 123, Name = "Fred" };
             using (MemoryStream ms = new MemoryStream())
             {
-                using (ProtoWriter writer = new ProtoWriter(ms, null))
+                using (ProtoWriter writer = new ProtoWriter(ms, null, null))
                 {
                     ser(cs1, writer);
                 }
                 byte[] blob = ms.ToArray();
                 ms.Position = 0;
-                using (ProtoReader reader = new ProtoReader(ms, null))
+                using (ProtoReader reader = new ProtoReader(ms, null, null))
                 {
                     CustomerStruct? cst = (CustomerStruct?)deser(null, reader);
                     Assert.IsTrue(cst.HasValue);

@@ -73,15 +73,17 @@ namespace Examples
             var data = new List<byte[]> {
                 new byte[] {0,1,2,3,4},
                 new byte[] {5,6,7},
-                new byte[] {8,9,10}
+                new byte[] {8,9,10},
+                new byte[] {}
             };
             var clone = Serializer.DeepClone(data);
 
             Assert.AreNotSame(data, clone);
-            Assert.AreEqual(3, clone.Count);
+            Assert.AreEqual(4, clone.Count);
             Assert.IsTrue(data[0].SequenceEqual(clone[0]));
             Assert.IsTrue(data[1].SequenceEqual(clone[1]));
             Assert.IsTrue(data[2].SequenceEqual(clone[2]));
+            Assert.IsTrue(data[3].SequenceEqual(clone[3]));
         }
 
         [Test]
@@ -238,12 +240,12 @@ namespace Examples
             Assert.IsNull(item.ListNoDefault);
             var clone = Serializer.DeepClone(item);
             Assert.IsNull(clone.ListNoDefault);
-
+           
             item.ListNoDefault = new List<int>();
             clone = Serializer.DeepClone(item);
             Assert.IsNotNull(clone.ListNoDefault);
             Assert.AreEqual(0, clone.ListNoDefault.Count);
-
+           
             item.ListNoDefault.Add(123);
             clone = Serializer.DeepClone(item);
             Assert.IsNotNull(clone.ListNoDefault);
@@ -335,7 +337,7 @@ namespace Examples
         {
             var foos = new List<Entity>();
             var clone = Serializer.DeepClone(foos);
-            Assert.IsNull(clone);
+            Assert.IsNotNull(clone);
         }
 
         [Test]
@@ -343,7 +345,7 @@ namespace Examples
         {
             var foos = new MyList();
             var clone = Serializer.DeepClone(foos);
-            Assert.IsNull(clone);
+            Assert.IsNotNull(clone);
         }
 
         [Test]
@@ -596,6 +598,46 @@ namespace Examples
         static void CheckLists(IEnumerable<Test3> original, IEnumerable<Test3> clone)
         {
             Assert.IsTrue(original.SequenceEqual(clone,new Test3Comparer()));
+        }
+
+        [Test]
+        public void CheckNakedLinkedListCanRoundtrip()
+        {
+            var list = new LinkedList<BasicItem>();
+            list.AddLast(new BasicItem{Value="abc"});
+            list.AddLast(new BasicItem{Value="def"});
+            var clone = Serializer.DeepClone(list);
+            Assert.AreEqual(2, clone.Count);
+            Assert.AreEqual("abc", clone.First.Value.Value);
+            Assert.AreEqual("def", clone.Last.Value.Value);
+        }
+        [Test]
+        public void CheckWrappedLinkedListCanRoundtrip()
+        {
+            var wrapper = new WithLinkedList();
+            wrapper.Items.AddLast(new BasicItem { Value = "abc" });
+            wrapper.Items.AddLast(new BasicItem { Value = "def" });
+            var clone = Serializer.DeepClone(wrapper);
+            Assert.AreEqual(2, clone.Items.Count);
+            Assert.AreEqual("abc", clone.Items.First.Value.Value);
+            Assert.AreEqual("def", clone.Items.Last.Value.Value);
+        }
+        [ProtoContract]
+        class BasicItem
+        {
+            [ProtoMember(1)]
+            public string Value { get; set; }
+        }
+        [ProtoContract]
+        class WithLinkedList
+        {
+            [ProtoMember(1)]
+            public LinkedList<BasicItem> Items { get; private set; }
+
+            public WithLinkedList()
+            {
+                Items = new LinkedList<BasicItem>();
+            }
         }
     }
 }

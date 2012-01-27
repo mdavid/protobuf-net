@@ -1,6 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿#if !NO_RUNTIME
+using System;
 using ProtoBuf.Serializers;
 
 namespace ProtoBuf.Meta
@@ -48,8 +47,10 @@ namespace ProtoBuf.Meta
 
         private IProtoSerializer BuildSerializer()
         {
-            IProtoSerializer ser = new SubItemSerializer(derivedType.Type, derivedType.GetKey(false, false), derivedType);
+            // note the caller here is MetaType.BuildSerializer, which already has the sync-lock
+            IProtoSerializer ser = new SubItemSerializer(derivedType.Type, derivedType.GetKey(false, false), derivedType, false);
             return new TagDecorator(fieldNumber, WireType.String, false, ser);
         }
     }
 }
+#endif

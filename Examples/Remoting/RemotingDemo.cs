@@ -66,7 +66,7 @@ namespace Examples.Remoting
                 // want to aim for twice the speed
                 decimal factor = 0.50M;
 #if DEBUG
-                factor = 0.80M; // be realistic in debug...
+                factor = 1.2M; // be realistic in debug...
 #endif
                 long target = (long) (dbTimer.ElapsedTicks * factor);
                 Assert.LessOrEqual(3, 5, "args wrong way around!");
@@ -255,8 +255,9 @@ namespace Examples.Remoting
                 }
                 readWatch.Stop();
 
-                Console.WriteLine("{0}:\t{1}μs/item (read)", caption, (readWatch.ElapsedMilliseconds * 1000.0) / loop);
-                Console.WriteLine("{0}:\t{1}μs/item (write)", caption, (writeWatch.ElapsedMilliseconds * 1000.0) / loop);
+                Console.WriteLine("{0}:\tread: {1}μs/item; write: {2}μs/item; bytes: {3})", caption,
+                    (readWatch.ElapsedMilliseconds * 1000.0) / loop,
+                    (writeWatch.ElapsedMilliseconds * 1000.0) / loop, ms.Length);
             }
         }
     }

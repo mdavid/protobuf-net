@@ -36,7 +36,13 @@ namespace DAL
     }
 
     [ProtoContract, DataContract, Serializable]
-    public class DatabaseCompatRem : ISerializable, IXmlSerializable
+    public class DatabaseCompatRem
+#if REMOTING
+        : ISerializable
+#endif
+#if PLAT_XMLSERIALIZER
+        , IXmlSerializable
+#endif
     {
         public const bool MASTER_GROUP = false;
 
@@ -50,7 +56,7 @@ namespace DAL
         }
 
         #region ISerializable Members
-
+#if REMOTING
         protected DatabaseCompatRem(SerializationInfo info, StreamingContext context)
             : this()
         {
@@ -60,11 +66,12 @@ namespace DAL
         {
             Serializer.Serialize <DatabaseCompatRem>(info, this);
         }
-
+#endif
         #endregion
 
         #region IXmlSerializable Members
 
+#if PLAT_XMLSERIALIZER
         System.Xml.Schema.XmlSchema IXmlSerializable.GetSchema()
         {
             return null;
@@ -79,7 +86,7 @@ namespace DAL
         {
             Serializer.Serialize(writer, this);            
         }
-
+#endif
         #endregion
     }
     

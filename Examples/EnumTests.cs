@@ -39,6 +39,14 @@ namespace Examples.DesignIdeas
         public SomeEnum Bar { get; set; }
     }
 
+    [ProtoContract]
+    class EnumNullableFoo
+    {
+        public EnumNullableFoo() { Bar = SomeEnum.Default; }
+        [ProtoMember(1), DefaultValue(SomeEnum.Default)]
+        public SomeEnum? Bar { get; set; }
+    }
+
     enum NegEnum
     {
         A = -1, B = 0, C = 1
@@ -51,7 +59,9 @@ namespace Examples.DesignIdeas
     }
     public enum HasConflictingKeys
     {
+        [ProtoEnum(Value = 1)]
         Foo = 0,
+        [ProtoEnum(Value = 2)]
         Bar = 0
     }
     public enum HasConflictingValues
@@ -172,6 +182,35 @@ enum blah {
         {
             CheckValue(SomeEnum.ChangeBoth, 0x08, 92);
         }
+
+
+        [Test]
+        public void TestFlagsEnum()
+        {
+            var orig = new TypeWithFlags { Foo = TypeWithFlags.FlagsEnum.A | TypeWithFlags.FlagsEnum.B };
+            var clone = Serializer.DeepClone(orig);
+            Assert.AreEqual(orig.Foo, clone.Foo);
+        }
+
+        [ProtoContract]
+        class TypeWithFlags
+        {
+            [Flags]
+            public enum FlagsEnum
+            {
+                None = 0, A = 1, B = 2, C = 4
+            }
+            [ProtoMember(1)]
+            public FlagsEnum Foo { get; set; }
+        }
+
+        [Test]
+        public void TestNulalbleEnumNameValueMapped()
+        {
+            var orig = new EnumNullableFoo { Bar = SomeEnum.ChangeBoth };
+            var clone = Serializer.DeepClone(orig);
+            Assert.AreEqual(orig.Bar, clone.Bar);
+        }
         [Test]
         public void TestEnumNameMapped() {
             CheckValue(SomeEnum.ChangeName, 0x08, 03);
@@ -244,5 +283,60 @@ enum blah {
                 clone = Serializer.DeepClone(obj);
             Assert.AreEqual(obj.Value, clone.Value, value.ToString());
         }
+
+
+        [ProtoContract]
+        enum EnumMarkedContract : ushort
+        {
+            None = 0, A, B, C, D
+        }
+        enum EnumNoContract : ushort
+        {
+            None = 0, A, B, C, D
+        }
+
+        [Test]
+        public void RoundTripTopLevelContract()
+        {
+            EnumMarkedContract value = EnumMarkedContract.C;
+            Assert.IsTrue(Program.CheckBytes(value, 8, 3));
+            Assert.AreEqual(value, Serializer.DeepClone(value));
+        }
+
+        [Test]
+        public void RoundTripTopLevelNullableContract()
+        {
+            EnumMarkedContract? value = EnumMarkedContract.C;
+            Assert.IsTrue(Program.CheckBytes(value, 8, 3));
+            Assert.AreEqual(value, Serializer.DeepClone(value));
+        }
+        [Test]
+        public void RoundTripTopLevelNullableContractNull()
+        {
+            EnumMarkedContract? value = null;
+            Assert.AreEqual(value, Serializer.DeepClone(value));
+        }
+        [Test]
+        public void RoundTripTopLevelNoContract()
+        {
+            EnumNoContract value = EnumNoContract.C;
+            Assert.IsTrue(Program.CheckBytes(value, 8, 3));
+            Assert.AreEqual(value, Serializer.DeepClone(value));
+        }
+
+        [Test]
+        public void RoundTripTopLevelNullableNoContract()
+        {
+            EnumNoContract? value = EnumNoContract.C;
+            Assert.IsTrue(Program.CheckBytes(value, 8, 3));
+            Assert.AreEqual(value, Serializer.DeepClone(value));
+        }
+        [Test]
+        public void RoundTripTopLevelNullableNoContractNull()
+        {
+            EnumNoContract? value = null;
+            Assert.AreEqual(value, Serializer.DeepClone(value));
+        }
+
     }
 }

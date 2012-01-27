@@ -2,6 +2,9 @@
 using System.IO;
 using NUnit.Framework;
 using ProtoBuf;
+using System.Data.Linq.Mapping;
+using System.ComponentModel;
+using System.Diagnostics;
 
 namespace Examples
 {
@@ -11,9 +14,107 @@ namespace Examples
         [ProtoMember(1)]
         public Guid Bar { get; set; }
     }
+
+    [ProtoContract(UseProtoMembersOnly = true)]
+    [ProtoPartialMember(25, "GUID")]
+    public partial class User { }
+
+    public partial class User
+    {
+        [global::System.Data.Linq.Mapping.ColumnAttribute(Storage = "_GUID", DbType = "UniqueIdentifier", UpdateCheck = UpdateCheck.Never)]
+        [global::System.Runtime.Serialization.DataMemberAttribute(Order = 26)]
+        public System.Guid GUID
+        {
+            get;
+            set;
+        }
+    }
+    [ProtoContract]
+    public class UserWithCrazyDefault
+    {
+        public UserWithCrazyDefault()
+        {
+            GUID = new Guid("01020304050607080102030405060708");
+        }
+        [ProtoMember(25), DefaultValue("01020304050607080102030405060708")]
+        public System.Guid GUID { get; set; }
+    }
+
     [TestFixture]
     public class GuidTests
     {
+        public static int Measure<T>(T value)
+        {
+            using (var ms = new MemoryStream())
+            {
+                Serializer.Serialize<T>(ms, value);
+                return (int)ms.Length;
+            }
+        }
+        [Test]
+        public void TestPartialWithGuid()
+        {
+            var user = new User();
+            var clone = Serializer.DeepClone(user);
+            Assert.AreEqual(user.GUID, clone.GUID);
+            Assert.AreEqual(0, Measure(user));
+
+            user = new User { GUID = new Guid("00112233445566778899AABBCCDDEEFF") };
+            clone = Serializer.DeepClone(user);
+            Assert.AreEqual(user.GUID, clone.GUID);
+            Assert.AreEqual(21, Measure(user));
+
+            Serializer.PrepareSerializer<User>();
+
+            user = new User();
+            clone = Serializer.DeepClone(user);
+            Assert.AreEqual(user.GUID, clone.GUID);
+            Assert.AreEqual(0, Measure(user));
+
+            user = new User { GUID = new Guid("00112233445566778899AABBCCDDEEFF") };
+            clone = Serializer.DeepClone(user);
+            Assert.AreEqual(user.GUID, clone.GUID);
+            Assert.AreEqual(21, Measure(user));
+
+
+        }
+
+        [Test]
+        public void TestGuidWithCrazyDefault()
+        {
+            var user = new UserWithCrazyDefault();
+            var clone = Serializer.DeepClone(user);
+            Assert.AreEqual(user.GUID, clone.GUID);
+            Assert.AreEqual(0, Measure(user));
+
+            user = new UserWithCrazyDefault { GUID = new Guid("00112233445566778899AABBCCDDEEFF") };
+            clone = Serializer.DeepClone(user);
+            Assert.AreEqual(user.GUID, clone.GUID);
+            Assert.AreEqual(21, Measure(user));
+
+            user = new UserWithCrazyDefault { GUID = Guid.Empty };
+            clone = Serializer.DeepClone(user);
+            Assert.AreEqual(user.GUID, clone.GUID);
+            Assert.AreEqual(3, Measure(user));
+
+            Serializer.PrepareSerializer<UserWithCrazyDefault>();
+
+            user = new UserWithCrazyDefault();
+            clone = Serializer.DeepClone(user);
+            Assert.AreEqual(user.GUID, clone.GUID);
+            Assert.AreEqual(0, Measure(user));
+
+            user = new UserWithCrazyDefault { GUID = new Guid("00112233445566778899AABBCCDDEEFF") };
+            clone = Serializer.DeepClone(user);
+            Assert.AreEqual(user.GUID, clone.GUID);
+            Assert.AreEqual(21, Measure(user));
+
+            user = new UserWithCrazyDefault { GUID = Guid.Empty };
+            clone = Serializer.DeepClone(user);
+            Assert.AreEqual(user.GUID, clone.GUID);
+            Assert.AreEqual(3, Measure(user));
+        }
+
         [Test]
         public void TestDeserializeEmptyWide()
         {

@@ -1,5 +1,4 @@
-﻿#if !NO_RUNTIME
-using System;
+﻿using System;
 using System.Collections;
 
 namespace ProtoBuf.Meta
@@ -142,8 +141,9 @@ namespace ProtoBuf.Meta
             {
                 for (int i = 0; i < length; i++)
                 {
-                    if (ReferenceEquals(instance, data[i])) return i;
-                }
+                    if ((object)instance == (object)data[i]) return i;
+                } // ^^^ (object) above should be preserved, even if this was typed; needs
+                  // to be a reference check
                 return -1;
             }
             internal int IndexOf(IPredicate predicate)
@@ -219,4 +219,3 @@ namespace ProtoBuf.Meta
 
 
 }
-#endif

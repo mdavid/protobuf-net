@@ -10,7 +10,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Examples</RootNamespace>
     <AssemblyName>Examples</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>..\ProtoBuf.snk</AssemblyOriginatorKeyFile>
@@ -35,6 +35,7 @@
     </FileUpgradeFlags>
     <OldToolsVersion>3.5</OldToolsVersion>
     <UpgradeBackupLocation />
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -93,6 +94,41 @@
     <ErrorReport>prompt</ErrorReport>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'iOS|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\iOS\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;NET_3_0 NET_3_5 REMOTING</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisLogFile>bin\Debug\Examples.exe.CodeAnalysisLog.xml</CodeAnalysisLogFile>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSetDirectories>;C:\Program Files (x86)\Microsoft Visual Studio 10.0\Team Tools\Static Analysis Tools\\Rule Sets</CodeAnalysisRuleSetDirectories>
+    <CodeAnalysisIgnoreBuiltInRuleSets>false</CodeAnalysisIgnoreBuiltInRuleSets>
+    <CodeAnalysisRuleDirectories>;C:\Program Files (x86)\Microsoft Visual Studio 10.0\Team Tools\Static Analysis Tools\FxCop\\Rules</CodeAnalysisRuleDirectories>
+    <CodeAnalysisIgnoreBuiltInRules>false</CodeAnalysisIgnoreBuiltInRules>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Unity|AnyCPU'">
+    <OutputPath>bin\Unity\</OutputPath>
+    <DefineConstants>TRACE;REMOTING</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <CodeAnalysisLogFile>bin\Net20\Examples.exe.CodeAnalysisLog.xml</CodeAnalysisLogFile>
+    <CodeAnalysisUseTypeNameInSuppression>true</CodeAnalysisUseTypeNameInSuppression>
+    <CodeAnalysisModuleSuppressionsFile>GlobalSuppressions.cs</CodeAnalysisModuleSuppressionsFile>
+    <UseVSHostingProcess>false</UseVSHostingProcess>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSetDirectories>;C:\Program Files (x86)\Microsoft Visual Studio 10.0\Team Tools\Static Analysis Tools\\Rule Sets</CodeAnalysisRuleSetDirectories>
+    <CodeAnalysisIgnoreBuiltInRuleSets>false</CodeAnalysisIgnoreBuiltInRuleSets>
+    <CodeAnalysisRuleDirectories>;C:\Program Files (x86)\Microsoft Visual Studio 10.0\Team Tools\Static Analysis Tools\FxCop\\Rules</CodeAnalysisRuleDirectories>
+    <CodeAnalysisIgnoreBuiltInRules>false</CodeAnalysisIgnoreBuiltInRules>
+    <CodeAnalysisFailOnMissingRules>false</CodeAnalysisFailOnMissingRules>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Enyim.Caching, Version=1.2.0.0, Culture=neutral, PublicKeyToken=cec98615db04012e, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
@@ -102,10 +138,12 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\Tools\log4net.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.CSharp" />
     <Reference Include="nunit.framework, Version=2.4.7.0, Culture=neutral, PublicKeyToken=96d09a1eb7f44a77">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\Tools\nunit.framework.dll</HintPath>
     </Reference>
+    <Reference Include="PresentationCore" />
     <Reference Include="System" />
     <Reference Include="System.configuration" />
     <Reference Include="System.Data" />
@@ -135,10 +173,13 @@
   <ItemGroup>
     <Compile Include="Arrays.cs" />
     <Compile Include="AutoFields.cs" />
+    <Compile Include="AutoTuple.cs" />
     <Compile Include="Callbacks.cs" />
+    <Compile Include="ComparisonToNDCS.cs" />
     <Compile Include="DataMemberOffset.cs" />
     <Compile Include="DetectMissing.cs" />
     <Compile Include="DictionaryTests.cs" />
+    <Compile Include="DynamicIFormatter.cs" />
     <Compile Include="EnumTests.cs" />
     <Compile Include="ExtendedTimeTests.cs" />
     <Compile Include="Extensibility.cs" />
@@ -146,14 +187,33 @@
     <Compile Include="GuidTests.cs" />
     <Compile Include="Inheritance.cs" />
     <Compile Include="InheritanceMidLevel.cs" />
+    <Compile Include="Issues\AssortedGoLiveRegressions.cs" />
     <Compile Include="Issues\ComplexGenerics\ComplexGenericExample.cs" />
+    <Compile Include="Issues\Issue124.cs" />
+    <Compile Include="Issues\Issue152.cs" />
+    <Compile Include="Issues\Issue170.cs" />
+    <Compile Include="Issues\Issue174cs.cs" />
+    <Compile Include="Issues\Issue176.cs" />
+    <Compile Include="Issues\Issue184.cs" />
+    <Compile Include="Issues\Issue185.cs" />
+    <Compile Include="Issues\Issue191.cs" />
+    <Compile Include="Issues\Issue192.cs" />
+    <Compile Include="Issues\Issue199.cs" />
+    <Compile Include="Issues\Issue202.cs" />
+    <Compile Include="Issues\Issue203.cs" />
+    <Compile Include="Issues\Issue243.cs" />
     <Compile Include="Issues\Issue26.cs" />
+    <Compile Include="Issues\Issue264.cs" />
+    <Compile Include="Issues\Issue265.cs" />
+    <Compile Include="Issues\Issue266.cs" />
     <Compile Include="Issues\Issue27.cs" />
+    <Compile Include="Issues\Issue218.cs" />
     <Compile Include="Issues\Issue29.cs" />
     <Compile Include="Issues\Issue32.cs" />
     <Compile Include="Issues\Issue41.cs" />
     <Compile Include="Issues\Issue45.cs" />
     <Compile Include="Issues\Issue48.cs" />
+    <Compile Include="Issues\Issue48\Issue202.cs" />
     <Compile Include="Issues\Issue54.cs" />
     <Compile Include="Issues\Issue62.cs" />
     <Compile Include="Issues\Issue70.cs">
@@ -163,12 +223,39 @@
     <Compile Include="Issues\SO3083847.cs" />
     <Compile Include="Issues\SO3101816.cs" />
     <Compile Include="Issues\SO3261310.cs" />
+    <Compile Include="Issues\SO6109616.cs" />
+    <Compile Include="Issues\SO6115986.cs" />
+    <Compile Include="Issues\SO6127380.cs" />
+    <Compile Include="Issues\SO6174298.cs" />
+    <Compile Include="Issues\SO6230449.cs" />
+    <Compile Include="Issues\SO6407130.cs" />
+    <Compile Include="Issues\SO6476958.cs" />
+    <Compile Include="Issues\SO6478579.cs" />
+    <Compile Include="Issues\SO6505590.cs" />
+    <Compile Include="Issues\SO6651451.cs" />
+    <Compile Include="Issues\SO6671829.cs" />
+    <Compile Include="Issues\SO7064824.cs" />
+    <Compile Include="Issues\SO7078615.cs" />
+    <Compile Include="Issues\SO7120856.cs" />
+    <Compile Include="Issues\SO7218127.cs" />
+    <Compile Include="Issues\SO7219959.cs" />
+    <Compile Include="Issues\SO7333233.cs" />
+    <Compile Include="Issues\SO7347694.cs" />
+    <Compile Include="Issues\SO7654066.cs" />
+    <Compile Include="Issues\SO7686734.cs" />
+    <Compile Include="Issues\SO7719000.cs" />
+    <Compile Include="Issues\SO7727355.cs" />
+    <Compile Include="Issues\SO8093623.cs" />
+    <Compile Include="Issues\SO8466936.cs" />
     <Compile Include="ItemsWithLengthPrefix.cs" />
     <Compile Include="ListAsInterfaceTests.cs" />
+    <Compile Include="ListsWithInheritance.cs" />
     <Compile Include="ListTests.cs" />
     <Compile Include="memcached.cs" />
     <Compile Include="MultiTypesWithLengthPrefix.cs" />
+    <Compile Include="NetObjectOptions.cs" />
     <Compile Include="NonGeneric.cs" />
+    <Compile Include="NonSeekableStreams.cs" />
     <Compile Include="NWind\CompatDb.cs" />
     <Compile Include="NWind\DataContext.cs" />
     <Compile Include="NWind\NWind.cs" />
@@ -210,6 +297,7 @@
     <Compile Include="ServiceModel\WcfTest.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="ShadowSetters.cs" />
     <Compile Include="SimpleStream\Collections.cs" />
     <Compile Include="SimpleStream\GroupedData.cs" />
     <Compile Include="SimpleStream\NullTypes.cs" />
@@ -220,7 +308,11 @@
     <Compile Include="TagInference.cs" />
     <Compile Include="TestNumbers\NumberTests.cs" />
     <Compile Include="TraceError.cs" />
+    <Compile Include="Tuples.cs" />
+    <Compile Include="TypeFactory.cs" />
+    <Compile Include="UnwrappedOuters.cs" />
     <Compile Include="ValueWrapper.cs" />
+    <Compile Include="WcfProtoBridge.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\ProtoGen\descriptor.proto">

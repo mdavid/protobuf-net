@@ -1,11 +1,6 @@
 ﻿#if !NO_RUNTIME
 using System;
-#if FEAT_COMPILER
-using System.Reflection.Emit;
 using ProtoBuf.Meta;
-
-#endif
-
 
 namespace ProtoBuf.Serializers
 {
@@ -29,9 +24,25 @@ namespace ProtoBuf.Serializers
             if (enumType == null) throw new ArgumentNullException("enumType");
             this.enumType = enumType;
             this.map = map;
+            if (map != null)
+            {
+                for (int i = 1; i < map.Length; i++)
+                for (int j = 0 ; j < i ; j++)
+                {
+                    if (map[i].WireValue == map[j].WireValue && !Equals(map[i].Value,map[j].Value))
+                    {
+                        throw new ProtoException("Multiple enums with wire-value " + map[i].WireValue);
+                    }
+                    if (Equals(map[i].Value, map[j].Value) && map[i].WireValue != map[j].WireValue)
+                    {
+                        throw new ProtoException("Multiple enums with deserialized-value " + map[i].WireValue);
+                    }
+                }
+
+            }
         }
-        private TypeCode GetTypeCode() {
-            return Type.GetTypeCode(Enum.GetUnderlyingType(enumType));
+        private ProtoTypeCode GetTypeCode() {
+            return Helpers.GetTypeCode(Enum.GetUnderlyingType(enumType));
         }
 
         private int EnumToWire(object value)
@@ -40,14 +51,14 @@ namespace ProtoBuf.Serializers
             {
                 switch (GetTypeCode())
                 { // unbox then convert to int
-                    case TypeCode.Byte: return (int)(byte)value;
-                    case TypeCode.SByte: return (int)(sbyte)value;
-                    case TypeCode.Int16: return (int)(short)value;
-                    case TypeCode.Int32: return (int)value;
-                    case TypeCode.Int64: return (int)(long)value;
-                    case TypeCode.UInt16: return (int)(ushort)value;
-                    case TypeCode.UInt32: return (int)(uint)value;
-                    case TypeCode.UInt64: return (int)(ulong)value;
+                    case ProtoTypeCode.Byte: return (int)(byte)value;
+                    case ProtoTypeCode.SByte: return (int)(sbyte)value;
+                    case ProtoTypeCode.Int16: return (int)(short)value;
+                    case ProtoTypeCode.Int32: return (int)value;
+                    case ProtoTypeCode.Int64: return (int)(long)value;
+                    case ProtoTypeCode.UInt16: return (int)(ushort)value;
+                    case ProtoTypeCode.UInt32: return (int)(uint)value;
+                    case ProtoTypeCode.UInt64: return (int)(ulong)value;
                     default: throw new InvalidOperationException();
                 }
             }
@@ -58,14 +69,14 @@ namespace ProtoBuf.Serializers
             {
                 switch (GetTypeCode())
                 { // convert from int then box 
-                    case TypeCode.Byte: return Enum.ToObject(enumType, (byte)value);
-                    case TypeCode.SByte: return Enum.ToObject(enumType, (sbyte)value);
-                    case TypeCode.Int16: return Enum.ToObject(enumType, (short)value);
-                    case TypeCode.Int32: return Enum.ToObject(enumType, value);
-                    case TypeCode.Int64: return Enum.ToObject(enumType, (long)value);
-                    case TypeCode.UInt16: return Enum.ToObject(enumType, (ushort)value);
-                    case TypeCode.UInt32: return Enum.ToObject(enumType, (uint)value);
-                    case TypeCode.UInt64: return Enum.ToObject(enumType, (ulong)value);
+                    case ProtoTypeCode.Byte: return Enum.ToObject(enumType, (byte)value);
+                    case ProtoTypeCode.SByte: return Enum.ToObject(enumType, (sbyte)value);
+                    case ProtoTypeCode.Int16: return Enum.ToObject(enumType, (short)value);
+                    case ProtoTypeCode.Int32: return Enum.ToObject(enumType, value);
+                    case ProtoTypeCode.Int64: return Enum.ToObject(enumType, (long)value);
+                    case ProtoTypeCode.UInt16: return Enum.ToObject(enumType, (ushort)value);
+                    case ProtoTypeCode.UInt32: return Enum.ToObject(enumType, (uint)value);
+                    case ProtoTypeCode.UInt64: return Enum.ToObject(enumType, (ulong)value);
                     default: throw new InvalidOperationException();
                 }
             }
@@ -109,7 +120,7 @@ namespace ProtoBuf.Serializers
 #if FEAT_COMPILER
         void IProtoSerializer.EmitWrite(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
-            TypeCode typeCode = GetTypeCode();
+            ProtoTypeCode typeCode = GetTypeCode();
             if (map == null)
             {
                 ctx.LoadValue(valueFrom);
@@ -145,7 +156,7 @@ namespace ProtoBuf.Serializers
         }
         void IProtoSerializer.EmitRead(Compiler.CompilerContext ctx, Compiler.Local valueFrom)
         {
-            TypeCode typeCode = GetTypeCode();
+            ProtoTypeCode typeCode = GetTypeCode();
             if (map == null)
             {
                 ctx.EmitBasicRead("ReadInt32", typeof(int));
@@ -210,22 +221,22 @@ namespace ProtoBuf.Serializers
                 }
             }
         }
-        private static void WriteEnumValue(Compiler.CompilerContext ctx, TypeCode typeCode, object value)
+        private static void WriteEnumValue(Compiler.CompilerContext ctx, ProtoTypeCode typeCode, object value)
         {
             switch (typeCode)
             {
-                case TypeCode.Byte: ctx.LoadValue((int)(byte)value); break;
-                case TypeCode.SByte: ctx.LoadValue((int)(sbyte)value); break;
-                case TypeCode.Int16: ctx.LoadValue((int)(short)value); break;
-                case TypeCode.Int32: ctx.LoadValue((int)(int)value); break;
-                case TypeCode.Int64: ctx.LoadValue((long)(long)value); break;
-                case TypeCode.UInt16: ctx.LoadValue((int)(ushort)value); break;
-                case TypeCode.UInt32: ctx.LoadValue((int)(uint)value); break;
-                case TypeCode.UInt64: ctx.LoadValue((long)(ulong)value); break;
+                case ProtoTypeCode.Byte: ctx.LoadValue((int)(byte)value); break;
+                case ProtoTypeCode.SByte: ctx.LoadValue((int)(sbyte)value); break;
+                case ProtoTypeCode.Int16: ctx.LoadValue((int)(short)value); break;
+                case ProtoTypeCode.Int32: ctx.LoadValue((int)(int)value); break;
+                case ProtoTypeCode.Int64: ctx.LoadValue((long)(long)value); break;
+                case ProtoTypeCode.UInt16: ctx.LoadValue((int)(ushort)value); break;
+                case ProtoTypeCode.UInt32: ctx.LoadValue((int)(uint)value); break;
+                case ProtoTypeCode.UInt64: ctx.LoadValue((long)(ulong)value); break;
                 default: throw new InvalidOperationException();
             }
         }
-        private static void WriteEnumValue(Compiler.CompilerContext ctx, TypeCode typeCode, Compiler.CodeLabel handler, Compiler.CodeLabel @continue, object value, Compiler.Local local)
+        private static void WriteEnumValue(Compiler.CompilerContext ctx, ProtoTypeCode typeCode, Compiler.CodeLabel handler, Compiler.CodeLabel @continue, object value, Compiler.Local local)
         {
             ctx.MarkLabel(handler);
             WriteEnumValue(ctx, typeCode, value);
@@ -233,7 +244,6 @@ namespace ProtoBuf.Serializers
             ctx.Branch(@continue, false); // "continue"
         }
 #endif
-
     }
 }
 #endif
